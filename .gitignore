@@ -2,3 +2,4 @@ iot_intrusion_dataset/
 preprocessedData.csv
 PcapPreprocessor.log
 __pycache__
+.idea/
