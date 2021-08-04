@@ -1,7 +1,6 @@
 import argparse
-import csv
 import logging
-import scapy.layers.inet
+import scapy.layers.inet as inet
 from scapy.all import *
 import os
 from PacketCounter import PacketCounter
@@ -66,13 +65,13 @@ def packet_handler(output_file):
         protocol = None
         info = None
 
-        if scapy.layers.inet.IP in pkt:
-            ip_src = pkt[scapy.layers.inet.IP].src
-            ip_dst = pkt[scapy.layers.inet.IP].dst
-            protocol = pkt[scapy.layers.inet.IP].proto
+        if inet.IP in pkt:
+            ip_src = pkt[inet.IP].src
+            ip_dst = pkt[inet.IP].dst
+            protocol = pkt[inet.IP].proto
 
-        if scapy.layers.inet.TCP in pkt:
-            info = pkt[scapy.layers.inet.TCP].ack
+        if inet.TCP in pkt:
+            info = pkt[inet.TCP].ack
 
         target = 0
 

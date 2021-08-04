@@ -1,10 +1,7 @@
-import logging
 from scapy.all import *
-import pyshark
 import logging
 import time
 import utils
-import lxml
 from CSVWriter import _CSVWriter
 
 if __name__ == '__main__':
