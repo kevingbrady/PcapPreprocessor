@@ -1,9 +1,7 @@
 import argparse
 import logging
-import scapy.layers.inet as inet
-from scapy.all import *
 import os
-from PacketCounter import PacketCounter
+from PacketData import PacketData
 
 log = logging.getLogger('main.utils')
 
@@ -21,8 +19,10 @@ def parse_command_line():
     parser.add_argument('-o', '--output_file', help='Name of output CSV file to be written', required=True)
     parser.add_argument('-k', '--keep_incomplete', help='Keep packets that do not have all the information to be parsed', action='store_true')
 
-    global gl_args
     gl_args = parser.parse_args()
+    gl_args.data_frame = PacketData(gl_args.output_file)
+
+    return gl_args
 
 
 def check_file(path):
@@ -47,38 +47,16 @@ def check_directory(path):
         raise argparse.ArgumentTypeError('Directory is not readable')
 
 
-def packet_handler(output_file):
-
-    packet_counter = PacketCounter()
-
-    def parse_packet(pkt):
-
-        if packet_counter.get_packet_count() == 0:
-            packet_counter.set_start_time(pkt.time)
-
-        packet_counter.increment()
-        pkt.frame = packet_counter.get_packet_count()
-        time_elapsed = pkt.time - packet_counter.get_start_time()
-        pkt_length = pkt.wirelen
-        ip_src = None
-        ip_dst = None
-        protocol = None
-        info = None
-
-        if inet.IP in pkt:
-            ip_src = pkt[inet.IP].src
-            ip_dst = pkt[inet.IP].dst
-            protocol = pkt[inet.IP].proto
-
-        if inet.TCP in pkt:
-            info = pkt[inet.TCP].ack
-
-        target = 0
-
-        if gl_args.verbose:
-            print(pkt.frame, time_elapsed, ip_src, ip_dst, protocol, pkt_length, info, target, end='\n')
-
-        if None not in (time_elapsed, ip_src, ip_dst, protocol, info) or gl_args.keep_incomplete:
-            output_file.writeCSVRow(pkt.frame, time_elapsed, ip_src, ip_dst, protocol, pkt_length, info, target)
-
-    return parse_packet
+def pretty_time_delta(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    if days > 0:
+        return '%dd %dh %dm %ds' % (days, hours, minutes, seconds)
+    elif hours > 0:
+        return '%dh %dm %ds' % (hours, minutes, seconds)
+    elif minutes > 0:
+        return '%dm %ds' % (minutes, seconds)
+    else:
+        return '%ds' % (seconds,)

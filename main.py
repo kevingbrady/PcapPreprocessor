@@ -1,10 +1,16 @@
-from scapy.all import *
-import logging
+import os
 import time
+import logging
+from ParallelSniffer import Sniffer
 import utils
-from CSVWriter import _CSVWriter
+import multiprocessing
 
 if __name__ == '__main__':
+
+    # Capture Program start time and set up multiprocessing manager
+    program_start = time.time()
+    multiprocessing.freeze_support()
+    manager = multiprocessing.Manager()
 
     # Turn on Logging
     logging.basicConfig(filename='PcapPreprocessor.log', filemode='w', level=logging.DEBUG, format='%(asctime)s %(message)s')
@@ -13,46 +19,38 @@ if __name__ == '__main__':
     startTime = time.time()
 
     # Parse Command Line Arguments
-    utils.parse_command_line()
+    gl_args = utils.parse_command_line()
 
-    output_file = _CSVWriter(utils.gl_args.output_file)
+    # Initialize Sniffer Controller Object
+    sniffer_controller = Sniffer(manager)
+    sniffer_controller.keep_incomplete = gl_args.keep_incomplete
 
-    if utils.gl_args.input_file:
+    packet_data = []
 
-        print('----------------------------------------------------')
-        print('Parsing file: ' + utils.gl_args.input_file)
-        logging.info('Parsing file: ' + utils.gl_args.input_file)
-        pcap_file = sniff(offline=utils.gl_args.input_file, prn=utils.packet_handler(output_file), store=0)
-        logging.info('File completed: ' + utils.gl_args.input_file)
-        print('File completed: ' + utils.gl_args.input_file)
-        print('----------------------------------------------------')
+    if gl_args.input_file:
 
-    elif utils.gl_args.input_directory:
+        # Start ParallelSniffer with single pcap file
+        packet_data = sniffer_controller.run_sniffer(gl_args.input_file)
 
-        logging.info('Directory Parsing Started at: ' + utils.gl_args.input_directory + '/')
-        print('Directory Parsing Started at: ' + utils.gl_args.input_directory + '/')
+    elif gl_args.input_directory:
 
-        # Create a loop that processes all files starting at rootPath, all subdirectories will also be processed
-        for root, dirs, files in os.walk(utils.gl_args.input_directory):
+        logging.info('Directory Parsing Started at: ' + gl_args.input_directory + '/')
+        print('Directory Parsing Started at: ' + gl_args.input_directory + '/')
+
+        # Create a loop that finds all pcap files starting at rootPath, all subdirectories will also be processed
+        file_list = []
+        for root, dirs, files in os.walk(gl_args.input_directory):
             for file in files:
+                if file.endswith('.pcap' or '.pcapng'):
+                    file_list.append(root + '/' + file)
 
-                print('----------------------------------------------------')
-                print('Parsing file: ' + file)
-                logging.info('Parsing file: ' + file)
-                pcap_file = sniff(offline=root + '/' + file, prn=utils.packet_handler(output_file), store=0)
-                logging.info('File completed: ' + file)
-                print('File completed: ' + file)
-                print('----------------------------------------------------')
+        # Start ParallelSniffer with list of pcap files
+        packet_data = sniffer_controller.start_sniffer(file_list)
 
-        logging.info('Directory Parsing Completed: ' + utils.gl_args.input_directory + '/')
-        print('Directory Parsing Completed: ' + utils.gl_args.input_directory + '/')
+    # Update Pandas data frame with processed packet data and output to CSV file
+    gl_args.data_frame.df = gl_args.data_frame.df.append(packet_data, ignore_index=True)
+    gl_args.data_frame.to_csv()
+    program_end = time.time()
 
-    output_file.writerClose()
-
+    print("Preprocessed " + str(sniffer_controller.total_packets.value) + " packets in " + utils.pretty_time_delta(program_end - program_start))
     print("Program End")
-
-
-# Use this for scapy async sniffer
-#sniffer = AsyncSniffer(offline=utils.gl_args.input_file, prn=utils.packet_handler(), store=0)
-#sniffer.start()
-#sniffer.join()
