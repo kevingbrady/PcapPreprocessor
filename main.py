@@ -9,7 +9,6 @@ if __name__ == '__main__':
 
     # Capture Program start time and set up multiprocessing manager
     program_start = time.time()
-    multiprocessing.freeze_support()
     manager = multiprocessing.Manager()
 
     # Turn on Logging
