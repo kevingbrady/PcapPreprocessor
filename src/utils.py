@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-from PacketData import PacketData
 
 log = logging.getLogger('main.utils')
 
@@ -18,11 +17,8 @@ def parse_command_line():
                         type=check_directory)
     parser.add_argument('-o', '--output_file', help='Name of output CSV file to be written', required=True)
     parser.add_argument('-k', '--keep_incomplete', help='Keep packets that do not have all the information to be parsed', action='store_true')
-
+    parser.add_argument('-c', '--enable_cicflowmeter', help='Enable calculating cicflowmeter metrics', action='store_true')
     gl_args = parser.parse_args()
-
-    # Create empty pandas dataframe to hold packet data
-    gl_args.data_frame = PacketData(gl_args.output_file)
 
     return gl_args
 

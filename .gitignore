@@ -1,4 +1,6 @@
 iot_intrusion_dataset/
+capture/
+Data_Research/
 preprocessedData.csv
 PcapPreprocessor.log
 __pycache__
