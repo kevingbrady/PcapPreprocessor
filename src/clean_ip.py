@@ -1,6 +1,7 @@
 from ipaddress import ip_address
 from typing import Any
 import numpy as np
+import math
 
 
 def _format_ip(val: Any, input_format: str, output_format: str, errors: str) -> Any:
@@ -31,13 +32,15 @@ def _format_ip(val: Any, input_format: str, output_format: str, errors: str) -> 
 
     # converts to integer format
     elif output_format == "integer":
-        result = int(address)
+
+        result = abs(hash(address))
 
     # convert to full representation
     else:
         dlm = "." if address.version == 4 else ":"  # delimiter
         result = dlm.join(f"{'0' * (4 - len(x))}{x}" for x in address.exploded.split(dlm))
 
+#    print(result)
     return result, 2 if result != val else 3
 
 
