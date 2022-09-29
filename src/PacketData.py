@@ -6,7 +6,7 @@ class PacketData:
     def __init__(self, fileName, enable_cicflowmeter):
 
         if enable_cicflowmeter:
-            data_frame = pd.DataFrame(columns=['No',
+            data_frame = pd.DataFrame(columns=[#"No",
                                                "src_ip",
                                                "dst_ip",
                                                "src_port",

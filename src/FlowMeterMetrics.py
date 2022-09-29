@@ -11,7 +11,7 @@ class FlowMeterMetrics:
 
     def __init__(self, *args, **kwargs):
         self.flows = {}
-        self.packets_count = 0
+        self.packet_count_total = 0
         self.output_mode = ''
 
     def process_packet(self, packet):
@@ -21,7 +21,7 @@ class FlowMeterMetrics:
         packet_flow_key = get_packet_flow_key(packet, direction)
         flow = self.flows.get(packet_flow_key)
 
-        self.packets_count += 1
+        self.packet_count_total += 1
 
         # If there is no forward flow with a count of 0
         if flow is None:
@@ -48,7 +48,7 @@ class FlowMeterMetrics:
             self.garbage_collect(packet.time)
             return flow, direction
 
-        if self.packets_count % GARBAGE_COLLECT_PACKETS == 0 or (
+        if self.packet_count_total % GARBAGE_COLLECT_PACKETS == 0 or (
             flow.duration > 120 and self.output_mode == "flow"
         ):
             self.garbage_collect(packet.time)
