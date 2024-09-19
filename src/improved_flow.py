@@ -219,11 +219,11 @@ class Flow:
 
     def get_protocol(self, packet):
 
-        if UDP in packet and IPv6 in packet:
-            protocol = packet[IPv6].nh
+        if packet.haslayer('IPv6'):
+            protocol = packet['IPv6'].nh
 
         else:
-            protocol = packet[IP].proto
+            protocol = packet['IP'].proto
 
         return protocol
 

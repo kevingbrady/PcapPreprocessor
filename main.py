@@ -1,12 +1,13 @@
-
 import os
 import time
 import logging
-from src.ParallelSniffer import Sniffer
+#from src.ParallelSniffer import Sniffer
+from src.Sniffer import Sniffer
 from src.PacketData import PacketData
-from src.CsvWriter import CsvWriter
-from src import utils
+#from src.CsvWriter import CsvWriter
+
 from multiprocessing import Manager
+from src import utils
 from scapy.all import rdpcap
 
 if __name__ == '__main__':
@@ -60,6 +61,4 @@ if __name__ == '__main__':
 
     # Update Pandas data frame with processed packet data
     program_end = time.time()
-
-    print("Preprocessed " + str(sniffer_controller.index.value) + " out of " + str(sniffer_controller.total_packets.value) + " total packets in " + utils.pretty_time_delta(program_end - program_start))
-    print("Program End")
+    sniffer_controller.print_end_message(program_end, program_start)

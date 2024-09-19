@@ -9,8 +9,9 @@ from scapy.layers.inet import IP, TCP, UDP
 from src.PacketCounter import PacketCounter
 from src.FlowMeterMetrics import FlowMeterMetrics
 from src.clean_ip import _format_ip
+from src.utils import pretty_time_delta
 import pandas as pd
-import multiprocessing
+from multiprocessing import Pool
 import numpy as np
 import csv
 
@@ -201,7 +202,7 @@ class Sniffer:
         else:
 
             self.file_count = len(file_list)
-            with multiprocessing.Pool(os.cpu_count()) as pool:
+            with Pool(os.cpu_count()) as pool:
 
                 pool.map(self.run_sniffer, file_list)
 
@@ -225,3 +226,9 @@ class Sniffer:
             self.file_count) + ']' + '\n' + str([i for i in self.completed]))
         print('-------------------------------------------------------------------------------------------------')
         time.sleep(0.25)
+
+    def print_end_message(self, program_start, program_end):
+
+        print("Preprocessed " + str(self.index.value) + " out of " + str(
+            self.total_packets.value) + " total packets in " + pretty_time_delta(program_end - program_start))
+        print("Program End")

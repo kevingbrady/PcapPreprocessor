@@ -51,7 +51,13 @@ class FlowBytes:
 
     @staticmethod
     def _header_size(packet):
-        return packet[IP].ihl * 4 if TCP in packet else 8
+
+        if packet.haslayer('TCP'):
+            if packet.haslayer('IP'):
+                return packet['IP'].ihl * 4
+            elif packet.haslayer('IPv6'):
+                return packet['IPv6'].plen
+        return 8
 
     def get_bytes(self, direction=None) -> int:
         """Calculates the amount bytes being transfered.
