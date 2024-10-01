@@ -19,6 +19,7 @@ def get_packet_fields(packet, direction):
         raise Exception("Only TCP protocols are supported.")
 
     if direction == PacketDirection.FORWARD:
+
         dest_ip = packet[ip].dst
         src_ip = packet[ip].src
         src_port = packet[protocol].sport
@@ -53,7 +54,5 @@ def get_packet_flow_key(packet, direction):
     """
 
     dest_ip, src_ip, src_port, dest_port = get_packet_fields(packet, direction)
-    hasher = hashlib.md5((str(dest_ip) + ', ' + str(src_ip) + ', ' + str(src_port) + ', ' + str(dest_port)).encode('utf-8'))
-    key = hasher.hexdigest()
 
-    return key
+    return dest_ip, src_ip, dest_port, src_port

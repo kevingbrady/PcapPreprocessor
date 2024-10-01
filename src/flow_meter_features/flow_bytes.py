@@ -1,4 +1,3 @@
-from scapy.layers.inet import IP, TCP
 from src.flow_meter_features.context.packet_direction import PacketDirection
 
 
@@ -28,7 +27,6 @@ class FlowBytes:
             }
         }
 
-        self.duration = 0
         self.feature = feature
 
     def process_packet(self, packet, direction):
@@ -54,6 +52,7 @@ class FlowBytes:
 
         if packet.haslayer('TCP'):
             if packet.haslayer('IP'):
+
                 return packet['IP'].ihl * 4
             elif packet.haslayer('IPv6'):
                 return packet['IPv6'].plen
@@ -68,7 +67,7 @@ class FlowBytes:
         """
         return self.byte_data[direction]['total_bytes']
 
-    def get_rate(self) -> float:
+    def get_rate(self, duration) -> float:
         """Calculates the rate of the bytes being transfered in the current flow.
 
         Returns:
@@ -76,10 +75,10 @@ class FlowBytes:
 
         """
 
-        if self.duration == 0:
+        if duration == 0:
             rate = 0
         else:
-            rate = self.get_bytes() / self.duration
+            rate = self.get_bytes() / duration
 
         return rate
 
@@ -92,7 +91,7 @@ class FlowBytes:
         """
         return self.get_bytes(PacketDirection.FORWARD)
 
-    def get_sent_rate(self) -> float:
+    def get_sent_rate(self, duration) -> float:
         """Calculates the rate of the bytes being sent in the current flow.
 
         Returns:
@@ -101,10 +100,10 @@ class FlowBytes:
         """
         sent = self.get_bytes_sent()
 
-        if self.duration == 0:
+        if duration == 0:
             rate = -1
         else:
-            rate = sent / self.duration
+            rate = sent / duration
 
         return rate
 
@@ -117,7 +116,7 @@ class FlowBytes:
         """
         return self.get_bytes(PacketDirection.REVERSE)
 
-    def get_received_rate(self) -> float:
+    def get_received_rate(self, duration) -> float:
         """Calculates the rate of the bytes being received in the current flow.
 
         Returns:
@@ -126,10 +125,10 @@ class FlowBytes:
         """
         received = self.get_bytes_received()
 
-        if self.duration == 0:
+        if duration == 0:
             rate = -1
         else:
-            rate = received / self.duration
+            rate = received / duration
 
         return rate
 
@@ -143,7 +142,7 @@ class FlowBytes:
 
         return self.byte_data[PacketDirection.FORWARD]['header_size_sum']
 
-    def get_forward_rate(self) -> int:
+    def get_forward_rate(self, duration) -> int:
         """Calculates the rate of the bytes being going forward
         in the current flow.
 
@@ -153,8 +152,8 @@ class FlowBytes:
         """
         forward = self.get_forward_header_bytes()
 
-        if self.duration > 0:
-            rate = forward / self.duration
+        if duration > 0:
+            rate = forward / duration
         else:
             rate = -1
 
@@ -180,7 +179,7 @@ class FlowBytes:
 
         return self.byte_data[PacketDirection.FORWARD]['header_size_min']
 
-    def get_reverse_rate(self) -> int:
+    def get_reverse_rate(self, duration) -> int:
         """Calculates the rate of the bytes being going reverse
         in the current flow.
 
@@ -190,10 +189,10 @@ class FlowBytes:
         """
         reverse = self.get_reverse_header_bytes()
 
-        if self.duration == 0:
+        if duration == 0:
             rate = -1
         else:
-            rate = reverse / self.duration
+            rate = reverse / duration
 
         return rate
 

@@ -20,8 +20,6 @@ class PacketCount:
             }
         }
 
-        self.duration = 0
-
     def process_packet(self, packet, direction):
         self.packet_count[None]['count'] += 1
         self.packet_count[direction]['count'] += 1
@@ -33,12 +31,12 @@ class PacketCount:
 
         return self.packet_count[direction]['count']
 
-    def get_rate(self, direction=None) -> float:
+    def get_rate(self, duration, direction=None) -> float:
 
-        if self.duration == 0:
+        if duration == 0:
             rate = 0
         else:
-            rate = self.get_total(direction) / self.duration
+            rate = self.get_total(direction) / duration
 
         return rate
 

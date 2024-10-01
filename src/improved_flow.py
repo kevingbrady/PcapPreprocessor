@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from typing import Any
 
@@ -10,8 +11,6 @@ from src.flow_meter_features.packet_count import PacketCount
 from src.flow_meter_features.packet_time import PacketTime
 from src.flow_meter_features.packet_length import PacketLength
 from src.flow_meter_features.active_idle import ActiveIdle
-from scapy.layers.inet6 import IPv6
-from scapy.layers.inet import IP, TCP, UDP
 from src.clean_ip import _format_ip
 
 
@@ -33,8 +32,7 @@ class Flow:
             self.dest_port,
         ) = packet_flow_key.get_packet_fields(packet, direction)
 
-        self.latest_timestamp = 0
-        self.start_timestamp = 0
+        self.direction = direction
         self.init_window_size = {
             PacketDirection.FORWARD: 0,
             PacketDirection.REVERSE: 0,
@@ -63,6 +61,7 @@ class Flow:
         self.packet_length = PacketLength()
         self.packet_time = PacketTime()
         self.active_idle = ActiveIdle()
+        self.completed = False
 
     def get_data(self, packet, direction) -> dict:
         """This method obtains the values of the features extracted from each flow.
@@ -77,27 +76,13 @@ class Flow:
 
         """
 
-        self.packet_time.process_packet(packet, direction)
-        self.flow_bytes.process_packet(packet, direction)
-        self.packet_count.process_packet(packet, direction)
-        self.packet_length.process_packet(packet, direction)
-        self.flag_count.process_packet(packet, direction)
-        self.active_idle.process_packet(packet, direction)
-
-        self.packet_count.duration = self.packet_time.get_duration()
-        self.flow_bytes.duration = self.packet_time.get_duration()
-
-        self.update_flow_bulk(packet, direction)
-        self.set_window_size(packet, direction)
-        self.latest_timestamp = self.packet_time.get_timestamp()
-
         clean_ip_src = _format_ip(self.src_ip, "auto", "integer", "raise")
         clean_ip_dst = _format_ip(self.dest_ip, "auto", "integer", "raise")
 
         ack = 0
 
-        if TCP in packet:
-            ack = packet[TCP].ack
+        if packet.haslayer('TCP'):
+            ack = packet['TCP'].ack
 
         data = {
             # Basic IP information
@@ -109,12 +94,12 @@ class Flow:
             "pkt_length": len(packet),
             "info": ack,
             # Basic information from packet times
-            "timestamp": self.latest_timestamp,
-            "flow_duration": 1e6 * self.packet_time.get_duration(),
-            "flow_byts_s": self.flow_bytes.get_rate(),
-            "flow_pkts_s": self.packet_count.get_rate(),
-            "fwd_pkts_s":self.packet_count.get_rate(PacketDirection.FORWARD),
-            "bwd_pkts_s": self.packet_count.get_rate(PacketDirection.REVERSE),
+            "timestamp": self.packet_time.timestamps[direction]['last_timestamp'],
+            "flow_duration": self.get_flow_duration(),
+            "flow_byts_s": self.flow_bytes.get_rate(self.get_flow_duration()),
+            "flow_pkts_s": self.packet_count.get_rate(self.get_flow_duration()),
+            "fwd_pkts_s":self.packet_count.get_rate(self.get_flow_duration(PacketDirection.FORWARD), PacketDirection.FORWARD),
+            "bwd_pkts_s": self.packet_count.get_rate(self.get_flow_duration(PacketDirection.REVERSE), PacketDirection.REVERSE),
             # Count total packets by direction
             "tot_fwd_pkts": self.packet_count.get_total(PacketDirection.FORWARD),
             "tot_bwd_pkts": self.packet_count.get_total(PacketDirection.REVERSE),
@@ -211,15 +196,15 @@ class Flow:
 
     def set_window_size(self, packet, direction):
 
-        if TCP in packet:
+        if packet.haslayer('TCP'):
             if direction == PacketDirection.FORWARD and self.init_window_size[direction] == 0:
-                self.init_window_size[direction] = packet[TCP].window
+                self.init_window_size[direction] = packet['TCP'].window
             elif direction == PacketDirection.REVERSE:
-                self.init_window_size[direction] = packet[TCP].window
+                self.init_window_size[direction] = packet['TCP'].window
 
     def get_protocol(self, packet):
 
-        if packet.haslayer('IPv6'):
+        if packet.haslayer('IPv6'):                  #UDP
             protocol = packet['IPv6'].nh
 
         else:
@@ -306,6 +291,8 @@ class Flow:
                         )
                     self.backward_bulk_last_timestamp = packet.time
 
-    @property
-    def duration(self):
-        return self.latest_timestamp - self.start_timestamp
+    def get_latest_timestamp(self, direction=None):
+        return self.packet_time.timestamps[direction]["last_timestamp"]
+
+    def get_flow_duration(self, direction=None):
+        return self.packet_time.timestamps[direction]["last_timestamp"] - self.packet_time.timestamps[direction]["first_timestamp"]
