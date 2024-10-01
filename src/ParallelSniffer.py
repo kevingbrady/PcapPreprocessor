@@ -24,6 +24,7 @@ class Sniffer:
     enable_cicflowmeter = False
     file_count = 0
     file_sizes = []
+    start_time = 0
 
     def __init__(self, manager, keep_incomplete, enable_cicflowmeter, output_file, columns):
 
@@ -57,7 +58,7 @@ class Sniffer:
 
         for pkt in packets:
             if counter.get_packet_count_total() == 0:
-                counter.set_start_time(pkt.time)
+                self.start_time = pkt.time
 
             counter.packet_count_total += 1
 
@@ -153,7 +154,7 @@ class Sniffer:
 
             else:
                 pkt.frame = counter.get_packet_count_preprocessed()
-                time_elapsed = pkt.time - counter.get_start_time()
+                time_elapsed = pkt.time - self.start_time
                 pkt_length = pkt.wirelen
                 ip_src = None
                 ip_dst = None

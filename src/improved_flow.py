@@ -32,7 +32,11 @@ class Flow:
             self.dest_port,
         ) = packet_flow_key.get_packet_fields(packet, direction)
 
+        self.src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
+        self.dest_ip_as_int = _format_ip(self.dest_ip, "auto", "integer", "raise")
         self.direction = direction
+        self.ack = 0
+        self.protocol = 0
         self.init_window_size = {
             PacketDirection.FORWARD: 0,
             PacketDirection.REVERSE: 0,
@@ -63,7 +67,7 @@ class Flow:
         self.active_idle = ActiveIdle()
         self.completed = False
 
-    def get_data(self, packet, direction) -> dict:
+    def get_data(self, direction=None) -> dict:
         """This method obtains the values of the features extracted from each flow.
 
         Note:
@@ -75,24 +79,15 @@ class Flow:
            list: returns a List of values to be outputted into a csv file.
 
         """
-
-        clean_ip_src = _format_ip(self.src_ip, "auto", "integer", "raise")
-        clean_ip_dst = _format_ip(self.dest_ip, "auto", "integer", "raise")
-
-        ack = 0
-
-        if packet.haslayer('TCP'):
-            ack = packet['TCP'].ack
-
         data = {
             # Basic IP information
-            "src_ip": clean_ip_src[0],
-            "dst_ip": clean_ip_dst[0],
+            "src_ip": self.src_ip_as_int[0],
+            "dst_ip": self.dest_ip_as_int[0],
             "src_port": self.src_port,
             "dst_port": self.dest_port,
-            "protocol": self.get_protocol(packet),
-            "pkt_length": len(packet),
-            "info": ack,
+            "protocol": self.protocol,
+            "pkt_length": self.packet_length.packet_lengths[direction],
+            "info": self.ack,
             # Basic information from packet times
             "timestamp": self.packet_time.timestamps[direction]['last_timestamp'],
             "flow_duration": self.get_flow_duration(),

@@ -66,7 +66,7 @@ class Sniffer:
                 if pkt.haslayer('IP') or pkt.haslayer('IPv6'):
                     if pkt.haslayer('TCP') or pkt.haslayer('UDP'):
                         flow, direction = flow_meter.process_packet(pkt)
-                        flow_metrics = flow.get_data(pkt, direction)
+                        flow_metrics = flow.get_data(direction)
 
                         packet_data.append([
                             flow_metrics["src_ip"],

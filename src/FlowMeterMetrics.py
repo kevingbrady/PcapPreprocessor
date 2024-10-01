@@ -4,7 +4,7 @@ from src.improved_flow import Flow
 from scapy.layers.inet import TCP
 
 EXPIRED_UPDATE = 120
-GARBAGE_COLLECT_PACKETS = 480
+GARBAGE_COLLECT_PACKETS = 1200
 
 
 class FlowMeterMetrics:
@@ -59,6 +59,11 @@ class FlowMeterMetrics:
 
         #print(packet_flow_key, flow.dest_ip, flow.src_ip, flow.src_port, flow.dest_port, flow.packet_length.data[None])
 
+        flow.ack = 0
+        if packet.haslayer('TCP'):
+            flow.ack = packet['TCP'].ack
+
+        flow.protocol = flow.get_protocol(packet)
         flow.active_idle.process_packet(packet, flow.get_latest_timestamp(), direction)
         flow.packet_time.process_packet(packet, direction)
         flow.flow_bytes.process_packet(packet, direction)
