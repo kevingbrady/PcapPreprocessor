@@ -73,14 +73,13 @@ class Statistics:
 
     def _calculate_max_min(self, value, direction):
 
-        if value > 0:
-            self.data[direction]['sum'] += value
-            self.data[direction]['max'] = max(value, self.data[direction]['max']) if self.data[direction]['max'] != 0 else value
-            self.data[direction]['min'] = min(value, self.data[direction]['min']) if self.data[direction]['min'] != 0 else value
+        self.data[direction]['sum'] += value
+        self.data[direction]['max'] = max([value, self.data[direction]['max']]) if self.data[direction]['max'] != 0 else value
+        self.data[direction]['min'] = min([value, self.data[direction]['min']]) if self.data[direction]['min'] != 0 else value
 
     def _calculate_statistics(self, value, direction):
 
-        if self.data[direction]['count'] > 1:
+        if self.data[direction]['count'] >= 1:
             #oldM = self.data[direction]['M']
             #oldS = self.data[direction]['S']
             #self.data[direction]['M'] = (oldM + (value - oldM)) / self.data[direction]['count']

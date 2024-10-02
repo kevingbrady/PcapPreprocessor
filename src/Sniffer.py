@@ -238,8 +238,8 @@ class Sniffer:
         print('-------------------------------------------------------------------------------------------------')
         time.sleep(0.25)
 
-    def print_end_message(self, program_start, program_end):
+    def print_end_message(self, elapsed_time):
 
         print("Preprocessed " + str(self.index) + " out of " + str(
-            self.total_packets) + " total packets in " + pretty_time_delta(program_end - program_start))
+            self.total_packets) + " total packets in " + pretty_time_delta(elapsed_time))
         print("Program End")

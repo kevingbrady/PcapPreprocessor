@@ -4,7 +4,7 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 class FlowBytes:
     """Extracts features from the traffic related to the bytes in a flow"""
 
-    def __init__(self, feature):
+    def __init__(self):
 
         self.byte_data = {
             None: {
@@ -26,8 +26,6 @@ class FlowBytes:
                 'header_size_max': 0
             }
         }
-
-        self.feature = feature
 
     def process_packet(self, packet, direction):
 
@@ -53,9 +51,9 @@ class FlowBytes:
         if packet.haslayer('TCP'):
             if packet.haslayer('IP'):
 
-                return packet['IP'].ihl * 4
+                return packet['IP'].fields['ihl'] * 4
             elif packet.haslayer('IPv6'):
-                return packet['IPv6'].plen
+                return packet['IPv6'].fields['plen']
         return 8
 
     def get_bytes(self, direction=None) -> int:
@@ -75,9 +73,8 @@ class FlowBytes:
 
         """
 
-        if duration == 0:
-            rate = 0
-        else:
+        rate = 0
+        if duration > 0:
             rate = self.get_bytes() / duration
 
         return rate
@@ -100,9 +97,8 @@ class FlowBytes:
         """
         sent = self.get_bytes_sent()
 
-        if duration == 0:
-            rate = -1
-        else:
+        rate = 0
+        if duration > 0:
             rate = sent / duration
 
         return rate
@@ -125,9 +121,8 @@ class FlowBytes:
         """
         received = self.get_bytes_received()
 
-        if duration == 0:
-            rate = -1
-        else:
+        rate = 0
+        if duration > 0:
             rate = received / duration
 
         return rate
@@ -152,10 +147,9 @@ class FlowBytes:
         """
         forward = self.get_forward_header_bytes()
 
+        rate = 0
         if duration > 0:
             rate = forward / duration
-        else:
-            rate = -1
 
         return rate
 
@@ -189,9 +183,8 @@ class FlowBytes:
         """
         reverse = self.get_reverse_header_bytes()
 
-        if duration == 0:
-            rate = -1
-        else:
+        rate = 0
+        if duration > 0:
             rate = reverse / duration
 
         return rate
@@ -208,48 +201,9 @@ class FlowBytes:
         reverse_header_bytes = self.get_reverse_header_bytes()
         forward_header_bytes = self.get_forward_header_bytes()
 
-        ratio = -1
-        if reverse_header_bytes != 0:
+        ratio = 0
+        if reverse_header_bytes > 0:
             ratio = forward_header_bytes / reverse_header_bytes
 
         return ratio
 
-    def get_bytes_per_bulk(self, packet_direction):
-        if packet_direction == PacketDirection.FORWARD:
-            if self.feature.forward_bulk_count != 0:
-                return self.feature.forward_bulk_size / self.feature.forward_bulk_count
-        else:
-            if self.feature.backward_bulk_count != 0:
-                return (
-                        self.feature.backward_bulk_size / self.feature.backward_bulk_count
-                )
-        return 0
-
-    def get_packets_per_bulk(self, packet_direction):
-        if packet_direction == PacketDirection.FORWARD:
-            if self.feature.forward_bulk_count != 0:
-                return (
-                        self.feature.forward_bulk_packet_count
-                        / self.feature.forward_bulk_count
-                )
-        else:
-            if self.feature.backward_bulk_count != 0:
-                return (
-                        self.feature.backward_bulk_packet_count
-                        / self.feature.backward_bulk_count
-                )
-        return 0
-
-    def get_bulk_rate(self, packet_direction):
-        if packet_direction == PacketDirection.FORWARD:
-            if self.feature.forward_bulk_count != 0 and self.feature.forward_bulk_duration > 0:
-                return (
-                        self.feature.forward_bulk_size / self.feature.forward_bulk_duration
-                )
-        else:
-            if self.feature.backward_bulk_count != 0 and self.feature.backward_bulk_duration > 0:
-                return (
-                        self.feature.backward_bulk_size
-                        / self.feature.backward_bulk_duration
-                )
-        return 0

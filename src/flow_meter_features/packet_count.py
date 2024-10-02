@@ -24,8 +24,8 @@ class PacketCount:
         self.packet_count[None]['count'] += 1
         self.packet_count[direction]['count'] += 1
 
-        self.has_payload(packet, None)
-        self.has_payload(packet, direction)
+        self.set_payload_count(packet)
+        self.set_payload_count(packet, direction)
 
     def get_total(self, direction=None) -> int:
 
@@ -59,12 +59,12 @@ class PacketCount:
 
     @staticmethod
     def get_payload(packet):
-        if "TCP" in packet:
+        if packet.haslayer('TCP'):
             return packet["TCP"].payload
-        elif "UDP" in packet:
+        if packet.haslayer('UDP'):
             return packet["UDP"].payload
         return 0
 
-    def has_payload(self, packet, direction=None):
+    def set_payload_count(self, packet, direction=None):
         if len(self.get_payload(packet)) > 0:
             self.packet_count[direction]['payload'] += 1

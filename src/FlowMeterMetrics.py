@@ -2,15 +2,16 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 from src.flow_meter_features.context.packet_flow_key import get_packet_flow_key
 from src.improved_flow import Flow
 from scapy.layers.inet import TCP
+from collections import OrderedDict
 
 EXPIRED_UPDATE = 120
-GARBAGE_COLLECT_PACKETS = 1200
+GARBAGE_COLLECT_PACKETS = 480
 
 
 class FlowMeterMetrics:
 
     def __init__(self, *args, **kwargs):
-        self.flows = {}
+        self.flows = OrderedDict()
         self.packet_count_total = 0
         self.output_mode = ''
 
@@ -20,7 +21,6 @@ class FlowMeterMetrics:
 
         packet_flow_key = get_packet_flow_key(packet, direction)
         flow = self.flows.get(packet_flow_key)
-
         self.packet_count_total += 1
 
         # If there is no forward flow with a count of 0
@@ -37,7 +37,7 @@ class FlowMeterMetrics:
             packet_flow_key = get_packet_flow_key(packet, direction)
             self.flows[packet_flow_key] = flow
 
-        if (packet.time - flow.get_latest_timestamp()) > EXPIRED_UPDATE:
+        if (packet.time - flow.packet_time.get_latest_timestamp()) > EXPIRED_UPDATE:
             # If the packet exists in the flow but the packet is sent
             # after too much of a delay than it is a part of a new flow.
             flow = Flow(packet, direction)
@@ -54,24 +54,24 @@ class FlowMeterMetrics:
                     flow.completed = True
                     self.garbage_collect(packet.time)
 
+        flow.ack = 0
+        if packet.haslayer('TCP'):
+            flow.ack = packet['TCP'].fields['ack']
+
+        flow.protocol = flow.get_protocol(packet)
+        flow.set_window_size(packet, direction)
+        flow.active_idle.process_packet(packet, flow.packet_time.get_latest_timestamp(), direction)
+        flow.packet_time.process_packet(packet, direction)
+        flow.packet_count.process_packet(packet, direction)
+        flow.packet_length.process_packet(packet, direction)
+        flow.packet_bulk.update_flow_bulk(packet, direction)
+        flow.flow_bytes.process_packet(packet, direction)
+        flow.flag_count.process_packet(packet, direction)
+
         if self.packet_count_total % GARBAGE_COLLECT_PACKETS == 0:
             self.garbage_collect(packet.time)
 
         #print(packet_flow_key, flow.dest_ip, flow.src_ip, flow.src_port, flow.dest_port, flow.packet_length.data[None])
-
-        flow.ack = 0
-        if packet.haslayer('TCP'):
-            flow.ack = packet['TCP'].ack
-
-        flow.protocol = flow.get_protocol(packet)
-        flow.active_idle.process_packet(packet, flow.get_latest_timestamp(), direction)
-        flow.packet_time.process_packet(packet, direction)
-        flow.flow_bytes.process_packet(packet, direction)
-        flow.packet_count.process_packet(packet, direction)
-        flow.packet_length.process_packet(packet, direction)
-        flow.flag_count.process_packet(packet, direction)
-        flow.update_flow_bulk(packet, direction)
-        flow.set_window_size(packet, direction)
 
         return flow, direction
 

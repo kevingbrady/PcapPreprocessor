@@ -6,7 +6,7 @@ from src.Sniffer import Sniffer
 from src.PacketData import PacketData
 #from src.CsvWriter import CsvWriter
 
-from multiprocessing import Manager
+from src.SnifferManager import SnifferManager
 from src import utils
 from scapy.all import rdpcap
 
@@ -14,7 +14,8 @@ if __name__ == '__main__':
 
     # Capture Program start time and set up multiprocessing manager
     program_start = time.time()
-    manager = Manager()
+
+    manager = SnifferManager()
 
     # Turn on Logging
     logging.basicConfig(filename='PcapPreprocessor.log', filemode='w', level=logging.DEBUG, format='%(asctime)s %(message)s')
@@ -59,6 +60,5 @@ if __name__ == '__main__':
 
         sniffer_controller.start_sniffer(file_list)
 
-    # Update Pandas data frame with processed packet data
     program_end = time.time()
-    sniffer_controller.print_end_message(program_end, program_start)
+    sniffer_controller.print_end_message(program_end - program_start)
