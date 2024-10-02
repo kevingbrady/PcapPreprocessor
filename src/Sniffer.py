@@ -11,27 +11,31 @@ from src.FlowMeterMetrics import FlowMeterMetrics
 from src.clean_ip import _format_ip
 from src.utils import pretty_time_delta
 import pandas as pd
+from multiprocessing import Pool, Manager
 import numpy as np
 import csv
-import time
-import json
 
 np.set_printoptions(linewidth=200000)
 
 
 class Sniffer:
+
     keep_incomplete = False
     enable_cicflowmeter = False
     file_count = 0
     file_sizes = []
 
-    def __init__(self, manager, keep_incomplete, enable_cicflowmeter, output_file, columns):
+    def __init__(self, keep_incomplete, enable_cicflowmeter, output_file, columns):
 
-        self.total_packets = 0
-        self.completed = []
-        self.in_progress = []
-        self.index = 0
-        self.start_time = 0
+        manager = Manager()
+
+        self.completed = manager.list()
+        self.in_progress = manager.list()
+
+        self.total_packets = manager.Value('i', 0)
+        self.index = manager.Value('i', 0)
+
+        self.write_lock = manager.Lock()
 
         self.keep_incomplete = keep_incomplete
         self.enable_cicflowmeter = enable_cicflowmeter
@@ -44,20 +48,20 @@ class Sniffer:
         self.display_progress()
         logging.info('Parsing file: ' + filename)
 
+        start_time = 0
         target = 0
 
         if filename.lower().__contains__('attack'):
             target = 1
 
+        flow_meter = FlowMeterMetrics(output_mode="flow")
         packets = PcapReader(filename)
         counter = PacketCounter()
         packet_data = []
 
-        flow_meter = FlowMeterMetrics(output_mode="flow")
-
         for pkt in packets:
             if counter.get_packet_count_total() == 0:
-                self.start_time = time.time()
+                start_time = pkt.time
 
             counter.packet_count_total += 1
 
@@ -65,111 +69,18 @@ class Sniffer:
 
                 if pkt.haslayer('IP') or pkt.haslayer('IPv6'):
                     if pkt.haslayer('TCP') or pkt.haslayer('UDP'):
+
                         flow, direction = flow_meter.process_packet(pkt)
                         flow_metrics = flow.get_data(direction)
 
-                        packet_data.append([
-                            flow_metrics["src_ip"],
-                            flow_metrics["dst_ip"],
-                            flow_metrics["src_port"],
-                            flow_metrics["dst_port"],
-                            flow_metrics["protocol"],
-                            flow_metrics["pkt_length"],
-                            flow_metrics["info"],
-                            flow_metrics["timestamp"],
-                            flow_metrics["flow_duration"],
-                            flow_metrics["flow_byts_s"],
-                            flow_metrics["flow_pkts_s"],
-                            flow_metrics["fwd_pkts_s"],
-                            flow_metrics["bwd_pkts_s"],
-                            flow_metrics["tot_fwd_pkts"],
-                            flow_metrics["tot_bwd_pkts"],
-                            flow_metrics["totlen_fwd_pkts"],
-                            flow_metrics["totlen_bwd_pkts"],
-                            flow_metrics["fwd_pkt_len_max"],
-                            flow_metrics["fwd_pkt_len_min"],
-                            flow_metrics["fwd_pkt_len_mean"],
-                            flow_metrics["fwd_pkt_len_std"],
-                            flow_metrics["bwd_pkt_len_max"],
-                            flow_metrics["bwd_pkt_len_min"],
-                            flow_metrics["bwd_pkt_len_mean"],
-                            flow_metrics["bwd_pkt_len_std"],
-                            flow_metrics["pkt_len_max"],
-                            flow_metrics["pkt_len_min"],
-                            flow_metrics["pkt_len_mean"],
-                            flow_metrics["pkt_len_std"],
-                            flow_metrics["pkt_len_var"],
-                            flow_metrics["fwd_header_len"],
-                            flow_metrics["bwd_header_len"],
-                            flow_metrics["fwd_seg_size_min"],
-                            flow_metrics["fwd_act_data_pkts"],
-                            flow_metrics["flow_iat_mean"],
-                            flow_metrics["flow_iat_max"],
-                            flow_metrics["flow_iat_min"],
-                            flow_metrics["flow_iat_std"],
-                            flow_metrics["fwd_iat_tot"],
-                            flow_metrics["fwd_iat_max"],
-                            flow_metrics["fwd_iat_min"],
-                            flow_metrics["fwd_iat_mean"],
-                            flow_metrics["fwd_iat_std"],
-                            flow_metrics["bwd_iat_tot"],
-                            flow_metrics["bwd_iat_max"],
-                            flow_metrics["bwd_iat_min"],
-                            flow_metrics["bwd_iat_mean"],
-                            flow_metrics["bwd_iat_std"],
-                            flow_metrics["fwd_psh_flags"],
-                            flow_metrics["bwd_psh_flags"],
-                            flow_metrics["fwd_urg_flags"],
-                            flow_metrics["bwd_urg_flags"],
-                            flow_metrics["fin_flag_cnt"],
-                            flow_metrics["syn_flag_cnt"],
-                            flow_metrics["rst_flag_cnt"],
-                            flow_metrics["psh_flag_cnt"],
-                            flow_metrics["ack_flag_cnt"],
-                            flow_metrics["urg_flag_cnt"],
-                            flow_metrics["ece_flag_cnt"],
-                            flow_metrics["down_up_ratio"],
-                            flow_metrics["pkt_size_avg"],
-                            flow_metrics["init_fwd_win_byts"],
-                            flow_metrics["init_bwd_win_byts"],
-                            flow_metrics["active_max"],
-                            flow_metrics["active_min"],
-                            flow_metrics["active_mean"],
-                            flow_metrics["active_std"],
-                            flow_metrics["idle_max"],
-                            flow_metrics["idle_min"],
-                            flow_metrics["idle_mean"],
-                            flow_metrics["idle_std"],
-                            flow_metrics["fwd_byts_b_avg"],
-                            flow_metrics["fwd_pkts_b_avg"],
-                            flow_metrics["bwd_byts_b_avg"],
-                            flow_metrics["bwd_pkts_b_avg"],
-                            flow_metrics["fwd_blk_rate_avg"],
-                            flow_metrics["bwd_blk_rate_avg"],
-                            target
-                        ])
+                        flow_metrics['Target'] = target
+                        packet_data.append(flow_metrics)
 
-                        '''
-                        print('{')
-                        for key, value in flow_metrics.items():
-                            print('\t\t', key, ': ', value)
-                        print('}')
-                        
-                        c = 0
-                        for key, flow in flow_meter.flows.items():
+                    # print(packet_data[-1])
 
-                            if flow.packet_count.get_total() >= 5:
-                                c += 1
-                                print("[", flow.src_ip, '(', flow.src_port, ") ------->", flow.dest_ip, '(', flow.dest_port,
-                                    ')', flow.get_flow_duration(), direction, flow.packet_count.get_total(), flow.packet_length.get_min(), flow.packet_length.get_max(), flow.packet_length.get_mean(), flow.packet_length.get_standard_deviation(), 'active:', flow.active_idle.active, 'idle: ', flow.active_idle.idle, "]")
-
-                        if c >= 1:
-                            print('\n\n')
-                        # print(packet_data[-1])
-                        '''
             else:
                 pkt.frame = counter.get_packet_count_preprocessed()
-                time_elapsed = pkt.time - self.start_time
+                time_elapsed = pkt.time - start_time
                 pkt_length = pkt.wirelen
                 ip_src = None
                 ip_dst = None
@@ -193,39 +104,43 @@ class Sniffer:
                     packet_data.append([pkt.frame, time_elapsed, ip_src, ip_dst, protocol, pkt_length, info, target])
                     counter.packet_count_preprocessed += 1
 
-        self.total_packets += counter.get_packet_count_total()
+        self.total_packets.value += counter.get_packet_count_total()
         self.in_progress.remove(filename)
         self.completed.append(filename)
         self.display_progress()
 
         logging.info('File completed: ' + filename)
 
-        # Append data to final CSV
+        # Append data to final CSV file
 
+        self.write_lock.acquire()
         self.write_data_to_csv(packet_data)
+        self.write_lock.release()
 
-    def start_sniffer(self, file_list):
+    def start_sniffer(self, file_list, parallel=False):
 
-        if type(file_list) is str:
+        self.file_count = len(file_list)
 
-            self.file_count = 1
-            self.run_sniffer(file_list)
+        if parallel:
+
+            with Pool(os.cpu_count()) as pool:
+
+                pool.map(self.run_sniffer, file_list)
 
         else:
 
-            self.file_count = len(file_list)
             for file in file_list:
                 self.run_sniffer(file)
 
-    def write_data_to_csv(self, data):
+    def write_data_to_csv(self, data, output_file):
 
-        header = True if self.index == 0 else False
-        mode = 'w' if self.index == 0 else 'a'
+        header = True if self.index.value == 0 else False
+        mode = 'w' if self.index.value == 0 else 'a'
 
         new_frame = pd.DataFrame(data, columns=self.columns)
-        new_frame.index += self.index
-        new_frame.to_csv(self.output_file, mode=mode, header=header, index_label='No')
-        self.index += len(data)
+        new_frame.index += self.index.value
+        new_frame.to_csv(output_file, mode=mode, header=header, index_label='No')
+        self.index.value += len(data)
 
     def display_progress(self):
 
@@ -240,6 +155,6 @@ class Sniffer:
 
     def print_end_message(self, elapsed_time):
 
-        print("Preprocessed " + str(self.index) + " out of " + str(
-            self.total_packets) + " total packets in " + pretty_time_delta(elapsed_time))
+        print("Preprocessed " + str(self.index.value) + " out of " + str(
+            self.total_packets.value) + " total packets in " + pretty_time_delta(elapsed_time))
         print("Program End")

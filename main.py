@@ -1,12 +1,10 @@
 import os
 import time
 import logging
-#from src.ParallelSniffer import Sniffer
 from src.Sniffer import Sniffer
 from src.PacketData import PacketData
 #from src.CsvWriter import CsvWriter
 
-from src.SnifferManager import SnifferManager
 from src import utils
 from scapy.all import rdpcap
 
@@ -14,8 +12,6 @@ if __name__ == '__main__':
 
     # Capture Program start time and set up multiprocessing manager
     program_start = time.time()
-
-    manager = SnifferManager()
 
     # Turn on Logging
     logging.basicConfig(filename='PcapPreprocessor.log', filemode='w', level=logging.DEBUG, format='%(asctime)s %(message)s')
@@ -30,14 +26,14 @@ if __name__ == '__main__':
     data_frame = PacketData(gl_args.output_file, gl_args.enable_cicflowmeter)
 
     # Initialize Sniffer Controller Object
-    sniffer_controller = Sniffer(manager, gl_args.keep_incomplete, gl_args.enable_cicflowmeter, gl_args.output_file, data_frame.df.columns)
+    sniffer_controller = Sniffer(gl_args.keep_incomplete, gl_args.enable_cicflowmeter, gl_args.output_file, data_frame.df.columns)
 
     packet_data = []
 
     if gl_args.input_file:
 
         # Start ParallelSniffer with single pcap file
-        packet_data = sniffer_controller.start_sniffer(gl_args.input_file)
+        packet_data = sniffer_controller.run_sniffer(gl_args.input_file)
 
     elif gl_args.input_directory:
 
@@ -45,8 +41,8 @@ if __name__ == '__main__':
         print('Directory Parsing Started at: ' + gl_args.input_directory + '/')
 
         # Create a loop that finds all pcap files starting at rootPath, all subdirectories will also be processed
-        file_list = []
 
+        file_list = []
         for root, dirs, files in os.walk(gl_args.input_directory):
             for file in files:
                 if file.endswith('.pcap' or '.pcapng'):
@@ -58,7 +54,7 @@ if __name__ == '__main__':
 
         # Start ParallelSniffer with list of pcap files
 
-        sniffer_controller.start_sniffer(file_list)
+        sniffer_controller.start_sniffer(file_list, parallel=False)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)
