@@ -114,7 +114,7 @@ class Sniffer:
         # Append data to final CSV file
 
         self.write_lock.acquire()
-        self.write_data_to_csv(packet_data)
+        self.write_data_to_csv(packet_data, self.output_file)
         self.write_lock.release()
 
     def start_sniffer(self, file_list, parallel=False):

@@ -56,7 +56,7 @@ class FlowMeterMetrics:
 
         flow.ack = 0
         if packet.haslayer('TCP'):
-            flow.ack = packet['TCP'].fields['ack']
+            flow.ack = packet['TCP'].ack
 
         flow.protocol = flow.get_protocol(packet)
         flow.set_window_size(packet, direction)
