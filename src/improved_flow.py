@@ -1,4 +1,5 @@
 import time
+import simplejson as json
 from enum import Enum
 from typing import Any
 
@@ -176,18 +177,19 @@ class Flow:
 
     def set_window_size(self, packet, direction):
 
-        if packet.haslayer('TCP'):
-
-            if self.init_window_size[direction] == 0:
-                self.init_window_size[direction] = packet['TCP'].window
+        if self.init_window_size[direction] == 0:
+            self.init_window_size[direction] = packet['TCP'].window
 
     def get_protocol(self, packet):
 
-        if packet.haslayer('IPv6'):                  #UDP
-            protocol = packet['IPv6'].fields['nh']
+        if self.packet_time.timestamps[None]['first_timestamp'] == 0:
+            if 'TCP' in packet:
+                self.protocol = 6
+            if 'UDP' in packet:
+                self.protocol = 17
 
-        else:
-            protocol = packet['IP'].fields['proto']
+    def __repr__(self):
 
-        return protocol
+        return json.dumps(self.get_data(), sort_keys=False, indent=4, use_decimal=False)
+
 

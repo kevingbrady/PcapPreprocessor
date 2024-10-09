@@ -2,3 +2,4 @@ pandas
 pytest
 python-utils
 scapy
+simplejson

@@ -48,12 +48,8 @@ class FlowBytes:
     @staticmethod
     def _header_size(packet):
 
-        if packet.haslayer('TCP'):
-            if packet.haslayer('IP'):
-
-                return packet['IP'].fields['ihl'] * 4
-            elif packet.haslayer('IPv6'):
-                return packet['IPv6'].fields['plen']
+        if 'TCP' in packet:
+            return 20 + packet['TCP'].dataofs
         return 8
 
     def get_bytes(self, direction=None) -> int:

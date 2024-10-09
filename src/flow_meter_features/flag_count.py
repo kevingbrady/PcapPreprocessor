@@ -42,11 +42,11 @@ class FlagCount:
 
     def process_packet(self, packet, direction):
 
-        flags = ''
-        if "TCP" in packet:
-            flags = packet["TCP"].flags
+        pkt_flags = ''
+        if 'TCP' in packet:
+            pkt_flags = str(packet['TCP'].flags)
 
-        for flag in flags:
+        for flag in pkt_flags:
             self.flags[None][flag] += 1
             self.flags[direction][flag] += 1
 

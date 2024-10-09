@@ -59,9 +59,9 @@ class PacketCount:
 
     @staticmethod
     def get_payload(packet):
-        if packet.haslayer('TCP'):
+        if 'TCP' in packet:
             return packet["TCP"].payload
-        if packet.haslayer('UDP'):
+        if 'UDP' in packet:
             return packet["UDP"].payload
         return 0
 

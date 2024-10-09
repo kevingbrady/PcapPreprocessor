@@ -1,8 +1,10 @@
 from src.flow_meter_features.context.packet_direction import PacketDirection
 from src.flow_meter_features.context.packet_flow_key import get_packet_flow_key
 from src.improved_flow import Flow
-from scapy.layers.inet import TCP
+#from scapy.layers.inet import TCP
 from collections import OrderedDict
+#import simplejson as json
+import json
 
 EXPIRED_UPDATE = 120
 GARBAGE_COLLECT_PACKETS = 480
@@ -43,35 +45,37 @@ class FlowMeterMetrics:
             flow = Flow(packet, direction)
             self.flows[packet_flow_key] = flow
 
-        if packet.haslayer(TCP):
-            if "R" in str(packet[TCP].flags):
+        if 'TCP' in packet:
+            if "R" in str(packet['TCP'].flags):
                 # If it has an RST flag then early collect flow and continue
                 flow.completed = True
-                self.garbage_collect(packet.time)
+                #self.garbage_collect(packet.time)
 
-            if "A" in str(packet[TCP].flags):
+            if "A" in str(packet['TCP'].flags):
                 if flow.flag_count.flag_count('F', PacketDirection.FORWARD) >= 1 and flow.flag_count.flag_count('F', PacketDirection.REVERSE) >= 1:
                     flow.completed = True
-                    self.garbage_collect(packet.time)
+                    #self.garbage_collect(packet.time)
 
-        flow.ack = 0
-        if packet.haslayer('TCP'):
-            flow.ack = packet['TCP'].ack
+        if not flow.completed:
 
-        flow.protocol = flow.get_protocol(packet)
-        flow.set_window_size(packet, direction)
-        flow.active_idle.process_packet(packet, flow.packet_time.get_latest_timestamp(), direction)
-        flow.packet_time.process_packet(packet, direction)
-        flow.packet_count.process_packet(packet, direction)
-        flow.packet_length.process_packet(packet, direction)
-        flow.packet_bulk.update_flow_bulk(packet, direction)
-        flow.flow_bytes.process_packet(packet, direction)
-        flow.flag_count.process_packet(packet, direction)
+            #print(packet_json)
+            flow.ack = 0
+            if 'TCP' in packet:
+
+                flow.ack = packet['TCP'].ack
+                flow.set_window_size(packet, direction)
+
+            flow.get_protocol(packet)
+            flow.active_idle.process_packet(packet, flow.packet_time.get_latest_timestamp(), direction)
+            flow.packet_time.process_packet(packet, direction)
+            flow.packet_count.process_packet(packet, direction)
+            flow.packet_length.process_packet(packet, direction)
+            flow.packet_bulk.update_flow_bulk(packet, direction)
+            flow.flow_bytes.process_packet(packet, direction)
+            flow.flag_count.process_packet(packet, direction)
 
         if self.packet_count_total % GARBAGE_COLLECT_PACKETS == 0:
             self.garbage_collect(packet.time)
-
-        #print(packet_flow_key, flow.dest_ip, flow.src_ip, flow.src_port, flow.dest_port, flow.packet_length.data[None])
 
         return flow, direction
 
