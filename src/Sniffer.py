@@ -64,14 +64,14 @@ class Sniffer:
 
             if self.enable_cicflowmeter:
 
-                if ('TCP' in pkt) or ('UDP' in pkt):
-                    flow, direction = flow_meter.process_packet(pkt)
-                    flow_metrics = flow.get_data(direction)
+                if ('IP' in pkt) or ('IPv6' in pkt):
+                    if ('TCP' in pkt) or ('UDP' in pkt):
+                        flow, direction = flow_meter.process_packet(pkt)
+                        flow_metrics = flow.get_data(direction)
 
-                    flow_metrics['Target'] = target
-                    packet_data.append(flow_metrics)
-
-                # print(packet_data[-1])
+                        flow_metrics['Target'] = target
+                        packet_data.append(flow_metrics)
+                        #print(next(iter(flow_meter.flows.items())))
 
             else:
                 pkt.frame = counter.get_packet_count_preprocessed()

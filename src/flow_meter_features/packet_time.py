@@ -38,8 +38,8 @@ class PacketTime(Statistics):
             iat = self.get_packet_iat(latest_time, direction)
             self.calculate_statistics(iat, direction)
 
-        self.timestamps[None]['last_timestamp'] = max([latest_time, self.timestamps[None]['last_timestamp']])
-        self.timestamps[direction]['last_timestamp'] = max([latest_time, self.timestamps[direction]['last_timestamp']])
+        self.timestamps[None]['last_timestamp'] = latest_time
+        self.timestamps[direction]['last_timestamp'] = latest_time
 
     def get_packet_iat(self, latest_time, direction=None):
 
@@ -50,4 +50,6 @@ class PacketTime(Statistics):
         return self.timestamps[direction]["last_timestamp"]
 
     def get_flow_duration(self, direction=None):
-        return self.timestamps[direction]["last_timestamp"] - self.timestamps[direction]["first_timestamp"]
+        if self.timestamps[direction]["first_timestamp"] > 0:
+            return self.timestamps[direction]["last_timestamp"] - self.timestamps[direction]["first_timestamp"]
+        return 0

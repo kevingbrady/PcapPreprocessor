@@ -67,9 +67,7 @@ class Statistics:
 
     def get_standard_deviation(self, direction=None):
 
-        if self.data[direction]['count'] <= 1:
-            return 0
-        return math.sqrt(self.get_variance(direction) / (self.data[direction]['count'] - 1))
+        return math.sqrt(self.get_variance(direction) / (self.data[direction]['count'] - 1)) if self.data[direction]['count'] > 1 else 0.0
 
     def _calculate_max_min(self, value, direction):
 

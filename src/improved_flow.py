@@ -1,10 +1,10 @@
 import time
 import simplejson as json
+import hashlib
 from enum import Enum
 from typing import Any
 
 from src.flow_meter_features import constants
-from src.flow_meter_features.context import packet_flow_key
 from src.flow_meter_features.context.packet_direction import PacketDirection
 from src.flow_meter_features.flag_count import FlagCount
 from src.flow_meter_features.flow_bytes import FlowBytes
@@ -28,14 +28,13 @@ class Flow:
         """
 
         (
-            self.dest_ip,
             self.src_ip,
+            self.dst_ip,
             self.src_port,
-            self.dest_port,
-        ) = packet_flow_key.get_packet_fields(packet, direction)
+            self.dst_port
+        ) = self.get_flow_address_info(packet, direction)
+        self.key = self.get_packet_flow_key(packet, direction)
 
-        self.src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
-        self.dest_ip_as_int = _format_ip(self.dest_ip, "auto", "integer", "raise")
         self.direction = direction
         self.ack = 0
         self.protocol = 0
@@ -52,6 +51,44 @@ class Flow:
         self.packet_time = PacketTime()
         self.active_idle = ActiveIdle()
         self.completed = False
+        self.prediction = None
+
+    @staticmethod
+    def get_flow_address_info(packet, direction):
+
+        ip = 'IPv6' if 'IPv6' in packet else 'IP'
+
+        if 'TCP' in packet:
+            protocol = 'TCP'
+        elif 'UDP' in packet:
+            protocol = 'UDP'
+        else:
+            raise Exception("Only TCP protocols are supported.")
+
+        if direction == PacketDirection.FORWARD:
+
+            dst_ip = packet[ip].dst
+            src_ip = packet[ip].src
+            src_port = packet[protocol].sport
+            dst_port = packet[protocol].dport
+        else:
+            dst_ip = packet[ip].src
+            src_ip = packet[ip].dst
+            src_port = packet[protocol].dport
+            dst_port = packet[protocol].sport
+
+        return src_ip, dst_ip, src_port, dst_port
+
+    @staticmethod
+    def get_packet_flow_key(packet, direction):
+
+        hasher = hashlib.sha256()
+
+        for value in Flow.get_flow_address_info(packet, direction):
+            hasher.update(str(value).encode('utf-8'))
+
+        flow_key = hasher.hexdigest()
+        return flow_key
 
     def get_data(self, direction=None) -> dict:
         """This method obtains the values of the features extracted from each flow.
@@ -65,12 +102,17 @@ class Flow:
            list: returns a List of values to be outputted into a csv file.
 
         """
+
+        src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
+        dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
+
         data = {
             # Basic IP information
-            "src_ip": self.src_ip_as_int[0],
-            "dst_ip": self.dest_ip_as_int[0],
+            "key": self.key,
+            "src_ip": src_ip_as_int[0],  # self.src_ip,
+            "dst_ip": dst_ip_as_int[0],   #self.dst_ip,
             "src_port": self.src_port,
-            "dst_port": self.dest_port,
+            "dst_port": self.dst_port,
             "protocol": self.protocol,
             "pkt_length": self.packet_length.packet_lengths[direction],
             "info": self.ack,
@@ -79,8 +121,10 @@ class Flow:
             "flow_duration": self.packet_time.get_flow_duration(),
             "flow_byts_s": self.flow_bytes.get_rate(self.packet_time.get_flow_duration()),
             "flow_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration()),
-            "fwd_pkts_s":self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.FORWARD), PacketDirection.FORWARD),
-            "bwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.REVERSE), PacketDirection.REVERSE),
+            "fwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.FORWARD),
+                                                     PacketDirection.FORWARD),
+            "bwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.REVERSE),
+                                                     PacketDirection.REVERSE),
             # Count total packets by direction
             "tot_fwd_pkts": self.packet_count.get_total(PacketDirection.FORWARD),
             "tot_bwd_pkts": self.packet_count.get_total(PacketDirection.REVERSE),
@@ -164,15 +208,6 @@ class Flow:
             ),
         }
 
-        # Duplicated features
-        data["fwd_seg_size_avg"] = data["fwd_pkt_len_mean"]
-        data["bwd_seg_size_avg"] = data["bwd_pkt_len_mean"]
-        data["cwe_flag_count"] = data["fwd_urg_flags"]
-        data["subflow_fwd_pkts"] = data["tot_fwd_pkts"]
-        data["subflow_bwd_pkts"] = data["tot_bwd_pkts"]
-        data["subflow_fwd_byts"] = data["totlen_fwd_pkts"]
-        data["subflow_bwd_byts"] = data["totlen_bwd_pkts"]
-
         return data
 
     def set_window_size(self, packet, direction):
@@ -182,14 +217,23 @@ class Flow:
 
     def get_protocol(self, packet):
 
-        if self.packet_time.timestamps[None]['first_timestamp'] == 0:
-            if 'TCP' in packet:
-                self.protocol = 6
-            if 'UDP' in packet:
-                self.protocol = 17
+        # if self.packet_time.timestamps[None]['first_timestamp'] == 0:
+        if 'TCP' in packet:
+            self.protocol = 6
+        if 'UDP' in packet:
+            self.protocol = 17
 
-    def __repr__(self):
+    def get_short_flow_output(self):
+        proto = {
+            0: '%NA',
+            6: 'TCP',
+            17: 'UDP'
+        }
+        return '[' + str(self.src_ip) + '(' + str(self.src_port) + ') <----------> ' + str(self.dst_ip) + '(' + str(
+            self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
+            self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
 
-        return json.dumps(self.get_data(), sort_keys=False, indent=4, use_decimal=False)
 
+def __repr__(self):
 
+        return json.dumps(self.get_data(), sort_keys=False, indent=4, use_decimal=True)

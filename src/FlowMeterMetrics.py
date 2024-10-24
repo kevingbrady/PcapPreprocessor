@@ -1,5 +1,4 @@
 from src.flow_meter_features.context.packet_direction import PacketDirection
-from src.flow_meter_features.context.packet_flow_key import get_packet_flow_key
 from src.improved_flow import Flow
 #from scapy.layers.inet import TCP
 from collections import OrderedDict
@@ -21,7 +20,7 @@ class FlowMeterMetrics:
 
         direction = PacketDirection.FORWARD
 
-        packet_flow_key = get_packet_flow_key(packet, direction)
+        packet_flow_key = Flow.get_packet_flow_key(packet, direction)
         flow = self.flows.get(packet_flow_key)
         self.packet_count_total += 1
 
@@ -29,14 +28,14 @@ class FlowMeterMetrics:
         if flow is None:
             # There might be one of it in reverse
             direction = PacketDirection.REVERSE
-            packet_flow_key = get_packet_flow_key(packet, direction)
+            packet_flow_key = Flow.get_packet_flow_key(packet, direction)
             flow = self.flows.get(packet_flow_key)
 
         if flow is None:
             # If no flow exists create a new flow
             direction = PacketDirection.FORWARD
             flow = Flow(packet, direction)
-            packet_flow_key = get_packet_flow_key(packet, direction)
+            packet_flow_key = Flow.get_packet_flow_key(packet, direction)
             self.flows[packet_flow_key] = flow
 
         if (packet.time - flow.packet_time.get_latest_timestamp()) > EXPIRED_UPDATE:
@@ -58,8 +57,8 @@ class FlowMeterMetrics:
 
         if not flow.completed:
 
-            #print(packet_json)
             flow.ack = 0
+
             if 'TCP' in packet:
 
                 flow.ack = packet['TCP'].ack
