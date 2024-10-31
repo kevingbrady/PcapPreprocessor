@@ -2,11 +2,12 @@ import os
 import time
 import logging
 from src.Sniffer import Sniffer
-from src.PacketData import PacketData
 #from src.CsvWriter import CsvWriter
 
 from src import utils
 from scapy.all import rdpcap
+
+logging.raiseExceptions = True
 
 if __name__ == '__main__':
 
@@ -22,11 +23,9 @@ if __name__ == '__main__':
     # Parse Command Line Arguments
     gl_args = utils.parse_command_line()
 
-    # Create empty pandas dataframe to hold packet data
-    data_frame = PacketData(gl_args.output_file, gl_args.enable_cicflowmeter)
 
     # Initialize Sniffer Controller Object
-    sniffer_controller = Sniffer(gl_args.keep_incomplete, gl_args.enable_cicflowmeter, gl_args.output_file, data_frame.df.columns)
+    sniffer_controller = Sniffer(gl_args.output_file)
 
     packet_data = []
 
@@ -50,11 +49,11 @@ if __name__ == '__main__':
                     file_list.append(file_path)
 
         # Sort file_list by file size so the program processes the largest files first
-        file_list.sort(key=lambda x: os.stat(x).st_size, reverse=True)
+        file_list = sorted(file_list, key=lambda filename: os.stat(filename).st_size, reverse=True)
 
         # Start ParallelSniffer with list of pcap files
 
-        sniffer_controller.start_sniffer(file_list, parallel=True)
+        results = sniffer_controller.start_sniffer(file_list, parallel=True)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)

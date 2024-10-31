@@ -60,9 +60,9 @@ class PacketCount:
     @staticmethod
     def get_payload(packet):
         if 'TCP' in packet:
-            return packet["TCP"].payload
+            return packet['TCP'].payload
         if 'UDP' in packet:
-            return packet["UDP"].payload
+            return packet['UDP'].payload
         return 0
 
     def set_payload_count(self, packet, direction=None):

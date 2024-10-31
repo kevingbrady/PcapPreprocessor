@@ -1,3 +1,5 @@
+import multiprocessing
+import os
 import sys
 
 # sys.stderr = None  # suppress stderr
@@ -5,12 +7,15 @@ from scapy.all import *
 
 # sys.stderr = sys.__stderr__  # restore stderr
 
+from src.data_columns import columns
 from src.PacketCounter import PacketCounter
 from src.FlowMeterMetrics import FlowMeterMetrics
 from src.clean_ip import _format_ip
 from src.utils import pretty_time_delta
+from itertools import groupby
+from operator import itemgetter
 import pandas as pd
-from multiprocessing import Pool, Manager
+from multiprocessing import Pool, Manager, cpu_count
 import numpy as np
 import csv
 
@@ -18,12 +23,10 @@ np.set_printoptions(linewidth=200000)
 
 
 class Sniffer:
-    keep_incomplete = False
-    enable_cicflowmeter = False
     file_count = 0
     file_sizes = []
 
-    def __init__(self, keep_incomplete, enable_cicflowmeter, output_file, columns):
+    def __init__(self, output_file):
 
         manager = Manager()
         self.completed = manager.list()
@@ -34,108 +37,96 @@ class Sniffer:
 
         self.write_lock = manager.Lock()
 
-        self.keep_incomplete = keep_incomplete
-        self.enable_cicflowmeter = enable_cicflowmeter
         self.output_file = output_file
         self.columns = columns
 
-    def run_sniffer(self, filename):
+    def run_sniffer(self, file):
 
-        self.in_progress.append(filename)
+        self.in_progress.append(file)
         self.display_progress()
-        logging.info('Parsing file: ' + filename)
+        logging.info('Parsing file: ' + file)
 
-        start_time = 0
         target = 0
 
-        if filename.lower().__contains__('attack'):
+        if file.lower().__contains__('attack'):
             target = 1
 
-        packets = PcapReader(filename)
+        packets = PcapReader(file)
         counter = PacketCounter()
-        packet_data = []
+        packet_data = {}
         flow_meter = FlowMeterMetrics(output_mode="flow")
 
         for pkt in packets:
-            if counter.get_packet_count_total() == 0:
-                start_time = pkt.time
 
             counter.packet_count_total += 1
 
-            if self.enable_cicflowmeter:
+            if ('IP' in pkt) or ('IPv6' in pkt):
+                if ('TCP' in pkt) or ('UDP' in pkt):
+                    flow, direction = flow_meter.process_packet(pkt)
+                    flow_metrics = flow.get_data(direction)
 
-                if ('IP' in pkt) or ('IPv6' in pkt):
-                    if ('TCP' in pkt) or ('UDP' in pkt):
-                        flow, direction = flow_meter.process_packet(pkt)
-                        flow_metrics = flow.get_data(direction)
+                    flow_metrics['Target'] = target
 
-                        flow_metrics['Target'] = target
-                        packet_data.append(flow_metrics)
-                        #print(next(iter(flow_meter.flows.items())))
+                    if flow.key not in packet_data:
+                        packet_data.update({flow.key: [flow_metrics]})
+                    else:
+                        packet_data[flow.key].append(flow_metrics)
 
-            else:
-                pkt.frame = counter.get_packet_count_preprocessed()
-                time_elapsed = pkt.time - start_time
-                pkt_length = pkt.wirelen
-                ip_src = None
-                ip_dst = None
-                protocol = None
-                info = 0  # ACK is only present in TCP packets
+                    # magic_char = '\033[F'
+                    # os.system('cls||clear')
+                    # output = ''.join([str(flow.key) + ': ' + flow.get_short_flow_output() for key, flow in flow_meter.flows.items()])
+                    # display_flow_count = output.count('\n')
+                    # ret_depth = magic_char * display_flow_count
+                    # print('{}{}'.format(ret_depth, output), flush=True, end='')
+                    # print(display_flow_count, "flows recorded ...")
+                    # time.sleep(0.15)
 
-                if 'IP' in pkt:
-                    cleaned_ip_src = _format_ip(pkt['IP'].src, "auto", "integer", "raise")
-                    cleaned_ip_dst = _format_ip(pkt['IP'].dst, "auto", "integer", "raise")
-                    ip_src = cleaned_ip_src[0]
-                    ip_dst = cleaned_ip_dst[0]
-                    protocol = pkt['IP'].proto
-
-                if 'TCP' in pkt:
-                    info = pkt['TCP'].ack
-
-                # if gl_args.verbose:
-                #    print(pkt.frame, time_elapsed, ip_src, ip_dst, protocol, pkt_length, info, target, end='\n')
-
-                if None not in (time_elapsed, ip_src, ip_dst, protocol, info) or self.keep_incomplete:
-                    packet_data.append([pkt.frame, time_elapsed, ip_src, ip_dst, protocol, pkt_length, info, target])
-                    counter.packet_count_preprocessed += 1
+                    # print(next(iter(flow_meter.flows.items())))
 
         self.total_packets.value += counter.get_packet_count_total()
-        self.in_progress.remove(filename)
-        self.completed.append(filename)
+        self.in_progress.remove(file)
+        self.completed.append(file)
         self.display_progress()
 
-        logging.info('File completed: ' + filename)
+        logging.info('File completed: ' + file)
 
         # Append data to final CSV file
 
-        self.write_lock.acquire()
-        self.write_data_to_csv(packet_data, self.output_file)
-        self.write_lock.release()
+        with self.write_lock:
+            self.write_data_to_csv(packet_data, self.output_file)
+
+        return 0
 
     def start_sniffer(self, file_list, parallel=False):
 
         self.file_count = len(file_list)
 
+        pool_size = int(self.file_count / 2) if self.file_count < 100 else 50
+
+        results = []
+
         if parallel:
 
-            with Pool(os.cpu_count()) as pool:
-
-                pool.map(self.run_sniffer, file_list)
+            results = Pool(pool_size).map(self.run_sniffer, file_list)
 
         else:
+            results = [self.run_sniffer(file) for file in file_list]
 
-            for file in file_list:
-                self.run_sniffer(file)
+        return results
 
     def write_data_to_csv(self, data, output_file):
 
-        header = True if self.index.value == 0 else False
         mode = 'w' if self.index.value == 0 else 'a'
-
-        new_frame = pd.DataFrame(data, columns=self.columns)
-        new_frame.index += self.index.value
-        new_frame.to_csv(output_file, mode=mode, header=header, index_label='No')
         self.index.value += len(data)
+
+        with open(output_file, mode=mode, newline='') as csv_file:
+
+            writer = csv.DictWriter(csv_file, fieldnames=self.columns)
+            if mode == 'w':
+                writer.writeheader()
+
+            for key, group in data.items():
+                writer.writerows([flow for flow in group])
 
     def display_progress(self):
 

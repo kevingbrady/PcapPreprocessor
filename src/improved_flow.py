@@ -103,14 +103,13 @@ class Flow:
 
         """
 
-        src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
-        dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
+        #src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
+        #dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
 
         data = {
             # Basic IP information
-            "key": self.key,
-            "src_ip": src_ip_as_int[0],  # self.src_ip,
-            "dst_ip": dst_ip_as_int[0],   #self.dst_ip,
+            "src_ip": self.src_ip,
+            "dst_ip": self.dst_ip,
             "src_port": self.src_port,
             "dst_port": self.dst_port,
             "protocol": self.protocol,
@@ -233,7 +232,6 @@ class Flow:
             self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
             self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
 
-
-def __repr__(self):
+    def __repr__(self):
 
         return json.dumps(self.get_data(), sort_keys=False, indent=4, use_decimal=True)

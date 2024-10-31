@@ -16,8 +16,6 @@ def parse_command_line():
     group.add_argument('-r', '--input_directory', help='Input directory of PCAP Files to be parsed and converted to CSV',
                         type=check_directory)
     parser.add_argument('-o', '--output_file', help='Name of output CSV file to be written', required=True)
-    parser.add_argument('-k', '--keep_incomplete', help='Keep packets that do not have all the information to be parsed', action='store_true')
-    parser.add_argument('-c', '--enable_cicflowmeter', help='Enable calculating cicflowmeter metrics', action='store_true')
     gl_args = parser.parse_args()
 
     return gl_args
