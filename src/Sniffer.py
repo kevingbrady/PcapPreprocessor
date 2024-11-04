@@ -10,12 +10,9 @@ from scapy.all import *
 from src.data_columns import columns
 from src.PacketCounter import PacketCounter
 from src.FlowMeterMetrics import FlowMeterMetrics
-from src.clean_ip import _format_ip
 from src.utils import pretty_time_delta
-from itertools import groupby
-from operator import itemgetter
-import pandas as pd
 from multiprocessing import Pool, Manager, cpu_count
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import numpy as np
 import csv
 
@@ -72,15 +69,16 @@ class Sniffer:
                     else:
                         packet_data[flow.key].append(flow_metrics)
 
-                    # magic_char = '\033[F'
-                    # os.system('cls||clear')
-                    # output = ''.join([str(flow.key) + ': ' + flow.get_short_flow_output() for key, flow in flow_meter.flows.items()])
-                    # display_flow_count = output.count('\n')
-                    # ret_depth = magic_char * display_flow_count
-                    # print('{}{}'.format(ret_depth, output), flush=True, end='')
-                    # print(display_flow_count, "flows recorded ...")
-                    # time.sleep(0.15)
-
+                    '''
+                    magic_char = '\033[F'
+                    os.system('cls||clear')
+                    output = ''.join([str(flow.key) + ': ' + flow.get_short_flow_output() for key, flow in flow_meter.flows.items()])
+                    display_flow_count = output.count('\n')
+                    ret_depth = magic_char * display_flow_count
+                    print('{}{}'.format(ret_depth, output), flush=True, end='')
+                    print(display_flow_count, "flows recorded ...")
+                    time.sleep(0.15)
+                    '''
                     # print(next(iter(flow_meter.flows.items())))
 
         self.total_packets.value += counter.get_packet_count_total()
@@ -92,8 +90,9 @@ class Sniffer:
 
         # Append data to final CSV file
 
-        with self.write_lock:
-            self.write_data_to_csv(packet_data, self.output_file)
+        self.write_lock.acquire()
+        self.write_data_to_csv(packet_data, self.output_file)
+        self.write_lock.release()
 
         return 0
 
@@ -101,23 +100,21 @@ class Sniffer:
 
         self.file_count = len(file_list)
 
-        pool_size = int(self.file_count / 2) if self.file_count < 100 else 50
-
-        results = []
-
         if parallel:
 
-            results = Pool(pool_size).map(self.run_sniffer, file_list)
+            with ProcessPoolExecutor(max_tasks_per_child=1) as pool:
+                # Sort file_list by file size so the program processes the largest files first
+                results = pool.map(self.run_sniffer, sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True))
 
         else:
             results = [self.run_sniffer(file) for file in file_list]
+            #results = self.run_sniffer(file_list[0])
 
         return results
 
     def write_data_to_csv(self, data, output_file):
 
         mode = 'w' if self.index.value == 0 else 'a'
-        self.index.value += len(data)
 
         with open(output_file, mode=mode, newline='') as csv_file:
 
@@ -126,6 +123,7 @@ class Sniffer:
                 writer.writeheader()
 
             for key, group in data.items():
+                self.index.value += len(group)
                 writer.writerows([flow for flow in group])
 
     def display_progress(self):

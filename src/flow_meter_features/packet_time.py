@@ -55,4 +55,4 @@ class PacketTime(Statistics):
     def get_flow_duration(self, direction=None):
         if self.timestamps[direction]["first_timestamp"] > 0:
             return self.timestamps[direction]["last_timestamp"] - self.timestamps[direction]["first_timestamp"]
-        return 0
+        return 0.0
