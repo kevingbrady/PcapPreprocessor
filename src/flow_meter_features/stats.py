@@ -1,5 +1,6 @@
 import math
 from src.flow_meter_features.context.packet_direction import PacketDirection
+from typing import Any
 
 
 class Statistics:
@@ -34,7 +35,7 @@ class Statistics:
             }
         }
 
-    def calculate_statistics(self, value, direction=None):
+    def calculate_statistics(self, value, direction=None) -> None:
 
         if direction is not None:
             self.data[direction]['count'] += 1
@@ -45,37 +46,37 @@ class Statistics:
         self._calculate_statistics(value, None)
         self._calculate_statistics(value, direction)
 
-    def get_avg(self, direction=None):
+    def get_avg(self, direction=None) -> float:
         return self.data[direction]['sum'] / self.data[direction]['count'] if self.data[direction]['count'] > 0 else 0.0
 
-    def get_sum(self, direction=None):
+    def get_sum(self, direction=None) -> Any:
         return self.data[direction]['sum']
 
-    def get_max(self, direction=None):
+    def get_max(self, direction=None) -> Any:
         return self.data[direction]['max']
 
-    def get_min(self, direction=None):
+    def get_min(self, direction=None) -> Any:
         return self.data[direction]['min']
 
-    def get_mean(self, direction=None):
+    def get_mean(self, direction=None) -> float:
 
         return self.data[direction]['mean'] if self.data[direction]['count'] > 0 else 0.0
 
-    def get_variance(self, direction=None):
+    def get_variance(self, direction=None) -> float:
 
         return self.data[direction]['variance'] if self.data[direction]['count'] > 0 else 0.0
 
-    def get_standard_deviation(self, direction=None):
+    def get_standard_deviation(self, direction=None) -> float:
 
         return math.sqrt(self.get_variance(direction) / (self.data[direction]['count'] - 1)) if self.data[direction]['count'] > 1 else 0.0
 
-    def _calculate_max_min(self, value, direction):
+    def _calculate_max_min(self, value, direction) -> None:
 
         self.data[direction]['sum'] += value
         self.data[direction]['max'] = max([value, self.data[direction]['max']]) if self.data[direction]['max'] != 0 else value
         self.data[direction]['min'] = min([value, self.data[direction]['min']]) if self.data[direction]['min'] != 0 else value
 
-    def _calculate_statistics(self, value, direction):
+    def _calculate_statistics(self, value, direction) -> None:
 
         if self.data[direction]['count'] >= 1:
             #oldM = self.data[direction]['M']

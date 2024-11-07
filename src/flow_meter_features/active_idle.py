@@ -12,7 +12,7 @@ class ActiveIdle:
         self.active_stats = Statistics()
         self.idle_stats = Statistics()
 
-    def process_packet(self, packet, last_timestamp, direction):
+    def process_packet(self, packet, last_timestamp, direction) -> None:
 
         if last_timestamp > 0:
 

@@ -50,11 +50,12 @@ class Flow:
         self.packet_length = PacketLength()
         self.packet_time = PacketTime()
         self.active_idle = ActiveIdle()
+        self.duration = 0.0
         self.completed = False
         self.prediction = None
 
     @staticmethod
-    def get_flow_address_info(packet, direction):
+    def get_flow_address_info(packet, direction) -> (str, str, int, int):
 
         ip = 'IPv6' if 'IPv6' in packet else 'IP'
 
@@ -80,7 +81,7 @@ class Flow:
         return src_ip, dst_ip, src_port, dst_port
 
     @staticmethod
-    def get_packet_flow_key(packet, direction):
+    def get_packet_flow_key(packet, direction) -> str:
 
         hasher = hashlib.sha256()
 
@@ -89,6 +90,10 @@ class Flow:
 
         flow_key = hasher.hexdigest()
         return flow_key
+
+    def flow_sort(self, packet_time) -> float:
+        self.duration = packet_time - self.packet_time.get_first_timestamp()
+        return self.duration
 
     def get_data(self, direction=None) -> dict:
         """This method obtains the values of the features extracted from each flow.
@@ -105,6 +110,7 @@ class Flow:
 
         #src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
         #dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
+        #self.duration = self.packet_time.get_flow_duration()
 
         data = {
             # Basic IP information
@@ -117,9 +123,9 @@ class Flow:
             "info": self.ack,
             # Basic information from packet times
             "timestamp": self.packet_time.timestamps[direction]['last_timestamp'],
-            "flow_duration": self.packet_time.get_flow_duration(),
-            "flow_byts_s": self.flow_bytes.get_rate(self.packet_time.get_flow_duration()),
-            "flow_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration()),
+            "flow_duration": self.duration,   #self.packet_time.get_flow_duration(),
+            "flow_byts_s": self.flow_bytes.get_rate(self.duration),
+            "flow_pkts_s": self.packet_count.get_rate(self.duration),
             "fwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.FORWARD),
                                                      PacketDirection.FORWARD),
             "bwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.REVERSE),
@@ -209,12 +215,12 @@ class Flow:
 
         return data
 
-    def set_window_size(self, packet, direction):
+    def set_window_size(self, packet, direction) -> None:
 
         if self.init_window_size[direction] == 0:
             self.init_window_size[direction] = packet['TCP'].window
 
-    def get_protocol(self, packet):
+    def get_protocol(self, packet) -> None:
 
         # if self.packet_time.timestamps[None]['first_timestamp'] == 0:
         if 'TCP' in packet:
@@ -222,7 +228,7 @@ class Flow:
         if 'UDP' in packet:
             self.protocol = 17
 
-    def get_short_flow_output(self):
+    def get_short_flow_output(self) -> str:
         proto = {
             0: '%NA',
             6: 'TCP',
@@ -232,6 +238,6 @@ class Flow:
             self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
             self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
 
-    def __repr__(self):
+    def __repr__(self) -> str:
 
         return json.dumps(self.get_data(), sort_keys=False, indent=4, use_decimal=True)

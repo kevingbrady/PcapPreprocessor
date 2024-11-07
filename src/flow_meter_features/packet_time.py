@@ -24,7 +24,7 @@ class PacketTime(Statistics):
 
         super().__init__()
 
-    def process_packet(self, packet, direction):
+    def process_packet(self, packet, direction) -> None:
 
         latest_time = packet.time
 
@@ -41,18 +41,18 @@ class PacketTime(Statistics):
         self.timestamps[None]['last_timestamp'] = latest_time
         self.timestamps[direction]['last_timestamp'] = latest_time
 
-    def get_packet_iat(self, latest_time, direction=None):
+    def get_packet_iat(self, latest_time, direction=None) -> float:
 
         inter_arrival_time = 1e3 * float(latest_time - self.timestamps[direction]['last_timestamp'])
         return inter_arrival_time
 
-    def get_latest_timestamp(self, direction=None):
+    def get_latest_timestamp(self, direction=None) -> float:
         return self.timestamps[direction]["last_timestamp"]
 
-    def get_first_timestamp(self, direction=None):
+    def get_first_timestamp(self, direction=None) -> float:
         return self.timestamps[direction]["first_timestamp"]
 
-    def get_flow_duration(self, direction=None):
+    def get_flow_duration(self, direction=None) -> float:
         if self.timestamps[direction]["first_timestamp"] > 0:
             return self.timestamps[direction]["last_timestamp"] - self.timestamps[direction]["first_timestamp"]
         return 0.0

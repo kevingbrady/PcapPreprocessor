@@ -12,7 +12,7 @@ class PacketLength(Statistics):
         }
         super().__init__()
 
-    def process_packet(self, packet, direction=None):
+    def process_packet(self, packet, direction=None) -> None:
 
         packet_length = len(packet)
 

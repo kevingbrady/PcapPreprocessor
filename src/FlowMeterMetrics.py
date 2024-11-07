@@ -1,40 +1,35 @@
 from src.flow_meter_features.context.packet_direction import PacketDirection
 from src.improved_flow import Flow
 from src.flow_meter_features.constants import EXPIRED_UPDATE, GARBAGE_COLLECT_PACKETS
-# from scapy.layers.inet import TCP
 from collections import OrderedDict
-# import simplejson as json
-import json
 
 
 class FlowMeterMetrics:
 
     def __init__(self, *args, **kwargs):
-        self.flows = {}
+        self.flows = OrderedDict()
         self.packet_count_total = 0
         self.output_mode = ''
 
-    def process_packet(self, packet):
+    def process_packet(self, packet) -> (Flow, PacketDirection):
 
-        direction = PacketDirection.FORWARD
-
-        packet_flow_key = Flow.get_packet_flow_key(packet, direction)
-        flow = self.flows.get(packet_flow_key)
         self.packet_count_total += 1
 
-        # If there is no forward flow with a count of 0
+        # Check flow in reverse direction
+        direction = PacketDirection.REVERSE
+        packet_flow_key = Flow.get_packet_flow_key(packet, direction)
+        flow = self.flows.get(packet_flow_key)
+
         if flow is None:
-            # There might be one of it in reverse
-            direction = PacketDirection.REVERSE
+            # Check flow in forward direction
+            direction = PacketDirection.FORWARD
             packet_flow_key = Flow.get_packet_flow_key(packet, direction)
             flow = self.flows.get(packet_flow_key)
 
-        if flow is None:
-            # If no flow exists create a new flow
-            direction = PacketDirection.FORWARD
-            flow = Flow(packet, direction)
-            packet_flow_key = Flow.get_packet_flow_key(packet, direction)
-            self.flows[packet_flow_key] = flow
+            if flow is None:
+                # If flow does not exist create new flow
+                flow = Flow(packet, direction)
+                self.flows[packet_flow_key] = flow
 
         '''if flow.packet_time.get_latest_timestamp() > 0 and (packet.time - flow.packet_time.get_latest_timestamp()) > EXPIRED_UPDATE:
             # If the packet exists in the flow but the packet is sent
@@ -47,8 +42,10 @@ class FlowMeterMetrics:
                 # If it has an RST flag then early collect flow and continue
                 flow.completed = True
                 self.garbage_collect(packet.time)
+
             if "A" in str(packet['TCP'].flags):
-                if flow.flag_count.flag_count('F', PacketDirection.FORWARD) >= 1 and flow.flag_count.flag_count('F', PacketDirection.REVERSE) >= 1:
+                if (flow.flag_count.flag_count('F', PacketDirection.FORWARD) >= 1
+                        and flow.flag_count.flag_count('F', PacketDirection.REVERSE) >= 1):
                     flow.completed = True
                     self.garbage_collect(packet.time)
 
@@ -64,14 +61,15 @@ class FlowMeterMetrics:
         flow.flow_bytes.process_packet(packet, direction)
         flow.flag_count.process_packet(packet, direction)
 
+        flow.flow_sort(packet.time)
+
         if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:   # or flow.packet_time.get_flow_duration() > 120:
             self.garbage_collect(packet.time)
 
         return flow, direction
 
     def garbage_collect(self, latest_time) -> None:
-        #for key, flow in self.flows.items():
-            #if latest_time - flow.packet_time.get_latest_timestamp() > EXPIRED_UPDATE:
-            #    flow.completed = True
 
-        self.flows = {key: flow for key, flow in self.flows.items() if flow.completed is False}
+        self.flows = {key: flow for key, flow in self.flows.items() if
+                      (latest_time - flow.packet_time.get_latest_timestamp()) <= EXPIRED_UPDATE
+                      and flow.completed is False}

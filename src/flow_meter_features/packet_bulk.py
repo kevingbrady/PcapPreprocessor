@@ -24,7 +24,7 @@ class BulkPacketData:
         self.backward_bulk_size = 0
         self.backward_bulk_size_tmp = 0
 
-    def update_flow_bulk(self, packet, direction):
+    def update_flow_bulk(self, packet, direction) -> None:
         """Update bulk flow
 
         Args:
@@ -95,33 +95,33 @@ class BulkPacketData:
                         self.backward_bulk_duration += (packet.time - self.backward_bulk_last_timestamp)
                     self.backward_bulk_last_timestamp = packet.time
                     
-    def get_bytes_per_bulk(self, direction):
+    def get_bytes_per_bulk(self, direction) -> float:
         if direction == PacketDirection.FORWARD:
-            if self.forward_bulk_count != 0:
+            if self.forward_bulk_count > 0:
                 return self.forward_bulk_size / self.forward_bulk_count
 
         else:
-            if self.backward_bulk_count != 0:
+            if self.backward_bulk_count > 0:
                 return self.backward_bulk_size / self.backward_bulk_count
-        return 0
+        return 0.0
 
-    def get_packets_per_bulk(self, direction):
+    def get_packets_per_bulk(self, direction) -> float:
         if direction == PacketDirection.FORWARD:
-            if self.forward_bulk_count != 0:
+            if self.forward_bulk_count > 0:
                 return self.forward_bulk_packet_count / self.forward_bulk_count
 
         else:
-            if self.backward_bulk_count != 0:
+            if self.backward_bulk_count > 0:
                 return self.backward_bulk_packet_count / self.backward_bulk_count
 
-        return 0
+        return 0.0
 
-    def get_bulk_rate(self, direction):
+    def get_bulk_rate(self, direction) -> float:
         if direction == PacketDirection.FORWARD:
-            if self.forward_bulk_count != 0 and self.forward_bulk_duration > 0:
+            if self.forward_bulk_duration > 0:
                 return self.forward_bulk_size / self.forward_bulk_duration
 
         else:
-            if self.backward_bulk_count != 0 and self.backward_bulk_duration > 0:
+            if self.backward_bulk_duration > 0:
                 return self.backward_bulk_size / self.backward_bulk_duration
-        return 0
+        return 0.0

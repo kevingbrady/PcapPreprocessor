@@ -43,7 +43,7 @@ def check_directory(path):
         raise argparse.ArgumentTypeError('Directory is not readable')
 
 
-def pretty_time_delta(seconds):
+def pretty_time_delta(seconds) -> str:
     seconds = int(seconds)
     days, seconds = divmod(seconds, 86400)
     hours, seconds = divmod(seconds, 3600)

@@ -46,7 +46,7 @@ class FlowBytes:
                                                            self._header_size(packet))
 
     @staticmethod
-    def _header_size(packet):
+    def _header_size(packet) -> int:
 
         if 'TCP' in packet:
             return 20 + packet['TCP'].dataofs
@@ -69,11 +69,10 @@ class FlowBytes:
 
         """
 
-        rate = 0
-        if duration > 0:
-            rate = self.get_bytes() / duration
+        if duration > 1:
+            return self.get_bytes() / duration
 
-        return rate
+        return 0.0
 
     def get_bytes_sent(self) -> int:
         """Calculates the amount bytes sent from the machine being used to run DoHlyzer.
@@ -91,13 +90,11 @@ class FlowBytes:
             float: The bytes/sec sent.
 
         """
-        sent = self.get_bytes_sent()
 
-        rate = 0
-        if duration > 0:
-            rate = sent / duration
+        if duration > 1:
+            return self.get_bytes_sent() / duration
 
-        return rate
+        return 0.0
 
     def get_bytes_received(self) -> int:
         """Calculates the amount bytes received.
@@ -115,13 +112,11 @@ class FlowBytes:
             float: The bytes/sec received.
 
         """
-        received = self.get_bytes_received()
 
-        rate = 0
-        if duration > 0:
-            rate = received / duration
+        if duration > 1:
+            return self.get_bytes_received() / duration
 
-        return rate
+        return 0.0
 
     def get_forward_header_bytes(self) -> int:
         """Calculates the amount of header bytes in the header sent in the same direction as the flow.
@@ -133,7 +128,7 @@ class FlowBytes:
 
         return self.byte_data[PacketDirection.FORWARD]['header_size_sum']
 
-    def get_forward_rate(self, duration) -> int:
+    def get_forward_rate(self, duration) -> float:
         """Calculates the rate of the bytes being going forward
         in the current flow.
 
@@ -141,13 +136,11 @@ class FlowBytes:
             float: The bytes/sec forward.
 
         """
-        forward = self.get_forward_header_bytes()
 
-        rate = 0
-        if duration > 0:
-            rate = forward / duration
+        if duration > 1:
+            return self.get_forward_header_bytes() / duration
 
-        return rate
+        return 0.0
 
     def get_reverse_header_bytes(self) -> int:
         """Calculates the amount of header bytes in the header sent in the opposite direction as the flow.
@@ -169,7 +162,7 @@ class FlowBytes:
 
         return self.byte_data[PacketDirection.FORWARD]['header_size_min']
 
-    def get_reverse_rate(self, duration) -> int:
+    def get_reverse_rate(self, duration) -> float:
         """Calculates the rate of the bytes being going reverse
         in the current flow.
 
@@ -177,13 +170,11 @@ class FlowBytes:
             float: The bytes/sec reverse.
 
         """
-        reverse = self.get_reverse_header_bytes()
 
-        rate = 0
-        if duration > 0:
-            rate = reverse / duration
+        if duration > 1:
+            return self.get_reverse_header_bytes() / duration
 
-        return rate
+        return 0.0
 
     def get_header_in_out_ratio(self) -> float:
         """Calculates the ratio of foward traffic over reverse traffic.
@@ -197,9 +188,8 @@ class FlowBytes:
         reverse_header_bytes = self.get_reverse_header_bytes()
         forward_header_bytes = self.get_forward_header_bytes()
 
-        ratio = 0
-        if reverse_header_bytes > 0:
-            ratio = forward_header_bytes / reverse_header_bytes
+        if reverse_header_bytes > 1:
+            return forward_header_bytes / reverse_header_bytes
 
-        return ratio
+        return 0.0
 
