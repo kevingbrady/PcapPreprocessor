@@ -7,6 +7,8 @@ from multiprocessing import Manager
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import csv
+import torch
+from torch_geometric.data import Data
 
 
 class Sniffer:
@@ -29,7 +31,7 @@ class Sniffer:
 
         logging.info('Parsing file: ' + file)
         self.in_progress.append(file)
-        self.display_progress()
+        #self.display_progress()
 
         target = 0
 
@@ -38,7 +40,7 @@ class Sniffer:
 
         packets = PcapReader(file)
         counter = PacketCounter()
-        packet_data = {}
+        graph_snapshots = []
         flow_meter = FlowMeterMetrics(output_mode="flow")
 
         for pkt in packets:
@@ -47,37 +49,36 @@ class Sniffer:
 
             if ('IP' in pkt) or ('IPv6' in pkt):
                 if ('TCP' in pkt) or ('UDP' in pkt):
+                    self.index.value += 1
                     flow, direction = flow_meter.process_packet(pkt)
                     flow_metrics = flow.get_data(direction)
-                    flow_metrics['Target'] = target
+                    #flow_metrics['Target'] = target
 
-                    if flow.key not in packet_data:
-                        packet_data.update({flow.key: [flow_metrics, ]})
-                    else:
-                        packet_data[flow.key].append(flow_metrics)
+                    graph = Data(
+                        edge_index=torch.tensor([(a, b) for (a, b, c, d) in flow_meter.flows.keys()],
+                                                dtype=torch.long).t().contiguous(),
+                        edge_attr=torch.tensor([float(y) for x, y in flow_metrics.items() if x not in ['src_ip', 'dst_ip']])
+                    )
 
-                    '''
-                    magic_char = '\033[F'
-                    os.system('cls||clear')
-                    output = ''.join([str(flow.key) + ': ' + flow.get_short_flow_output() for key, flow in flow_meter.flows.items()])
-                    display_flow_count = output.count('\n')
-                    ret_depth = magic_char * display_flow_count
-                    print('{}{}'.format(ret_depth, output), flush=True, end='')
-                    print(display_flow_count, "flows recorded ...")
-                    time.sleep(0.15)
-                    '''
-                    # print(next(iter(flow_meter.flows.items())))
+                    graph.num_nodes = graph.edge_index.max().item() + 1
+                    graph_snapshots.append(graph)
+
+                    print('Nodes: ', graph.num_nodes)
+                    print('Edges: ', graph.num_edges)
+                    print('Graph Snapshots: ', len(graph_snapshots))
+                    print('\n\n')
+
 
         # Append data to final CSV file
-
+        '''
         self.write_lock.acquire()
         self.write_data_to_csv(packet_data, self.output_file)
         self.write_lock.release()
-
+        '''
         self.total_packets.value += counter.get_packet_count_total()
         self.in_progress.remove(file)
         self.completed.append(file)
-        self.display_progress()
+        #self.display_progress()
 
         logging.info('File completed: ' + file)
 
@@ -85,16 +86,20 @@ class Sniffer:
 
     def start_sniffer(self, file_list, parallel=False) -> list:
 
-        self.file_count = len(file_list)
+        if type(file_list) is str:
+            results = self.run_sniffer(file_list)
 
-        if parallel:
+        elif type(file_list) is list:
 
-            with ProcessPoolExecutor(max_tasks_per_child=1) as pool:
-                # Sort file_list by file size so the program processes the largest files first
-                results = pool.map(self.run_sniffer, sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True))
+            self.file_count = len(file_list)
+            if parallel:
 
-        else:
-            results = [self.run_sniffer(file) for file in file_list]
+                with ProcessPoolExecutor(max_tasks_per_child=1) as pool:
+                    # Sort file_list by file size so the program processes the largest files first
+                    results = pool.map(self.run_sniffer, sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True))
+
+            else:
+                results = [self.run_sniffer(file) for file in file_list]
 
         return results
 

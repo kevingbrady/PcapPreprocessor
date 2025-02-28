@@ -33,7 +33,7 @@ class Flow:
             self.src_port,
             self.dst_port
         ) = self.get_flow_address_info(packet, direction)
-        self.key = self.get_packet_flow_key(packet, direction)
+        #self.key = self.get_packet_flow_key(packet, direction)
 
         self.direction = direction
         self.ack = 0
@@ -80,6 +80,7 @@ class Flow:
 
         return src_ip, dst_ip, src_port, dst_port
 
+    '''
     @staticmethod
     def get_packet_flow_key(packet, direction) -> str:
 
@@ -90,6 +91,8 @@ class Flow:
 
         flow_key = hasher.hexdigest()
         return flow_key
+
+    '''
 
     def flow_sort(self, packet_time) -> float:
         self.duration = packet_time - self.packet_time.get_first_timestamp()

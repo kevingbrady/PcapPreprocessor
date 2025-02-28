@@ -1,5 +1,5 @@
-pandas
-pytest
 python-utils
-scapy
+conda-forge::scapy
 simplejson
+pytorch
+pyg

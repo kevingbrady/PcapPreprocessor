@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
         # Start ParallelSniffer with list of pcap files
 
-        results = sniffer_controller.start_sniffer(file_list, parallel=True)
+        results = sniffer_controller.start_sniffer(file_list[-1], parallel=False)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)

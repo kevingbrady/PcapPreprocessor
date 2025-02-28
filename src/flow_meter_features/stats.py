@@ -79,10 +79,7 @@ class Statistics:
     def _calculate_statistics(self, value, direction) -> None:
 
         if self.data[direction]['count'] >= 1:
-            #oldM = self.data[direction]['M']
-            #oldS = self.data[direction]['S']
-            #self.data[direction]['M'] = (oldM + (value - oldM)) / self.data[direction]['count']
-            #self.data[direction]['S'] = oldS + (value - oldM) * (value - self.data[direction]['M'])
+
             new_mean = self.data[direction]['mean'] + (value - self.data[direction]['mean']) * 1./self.data[direction]['count']
             new_variance = self.data[direction]['variance'] + (value - self.data[direction]['mean']) * (value - new_mean)
 
