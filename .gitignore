@@ -4,6 +4,5 @@ Data_Research/
 preprocessedData.csv
 preprocessedData_noIPv6.csv
 PcapPreprocessor.log
-graph_data.pkl
 __pycache__
 .idea/
