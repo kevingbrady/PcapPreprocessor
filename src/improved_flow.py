@@ -33,7 +33,7 @@ class Flow:
             self.src_port,
             self.dst_port
         ) = self.get_flow_address_info(packet, direction)
-        # self.key = self.get_packet_flow_key(packet, direction)
+        #self.key = self.get_packet_flow_key(packet, direction)
 
         self.direction = direction
         self.ack = 0
@@ -111,9 +111,9 @@ class Flow:
 
         """
 
-        # src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
-        # dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
-        # self.duration = self.packet_time.get_flow_duration()
+        #src_ip_as_int = _format_ip(self.src_ip, "auto", "integer", "raise")
+        #dst_ip_as_int = _format_ip(self.dst_ip, "auto", "integer", "raise")
+        #self.duration = self.packet_time.get_flow_duration()
 
         data = {
             # Basic IP information
@@ -126,7 +126,7 @@ class Flow:
             "info": self.ack,
             # Basic information from packet times
             "timestamp": self.packet_time.timestamps[direction]['last_timestamp'],
-            "flow_duration": self.duration,  # self.packet_time.get_flow_duration(),
+            "flow_duration": self.duration,   #self.packet_time.get_flow_duration(),
             "flow_byts_s": self.flow_bytes.get_rate(self.duration),
             "flow_pkts_s": self.packet_count.get_rate(self.duration),
             "fwd_pkts_s": self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.FORWARD),
@@ -240,89 +240,6 @@ class Flow:
         return '[' + str(self.src_ip) + '(' + str(self.src_port) + ') <----------> ' + str(self.dst_ip) + '(' + str(
             self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
             self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
-
-    def get_data_as_list(self, direction=None):
-
-        return [*map(float, [self.src_port,
-                             self.dst_port,
-                             self.protocol,
-                             self.packet_length.packet_lengths[direction],
-                             self.ack,
-                             self.packet_time.timestamps[direction]['last_timestamp'],
-                             self.duration,
-                             self.flow_bytes.get_rate(self.duration),
-                             self.packet_count.get_rate(self.duration),
-                             self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.FORWARD),
-                                                        PacketDirection.FORWARD),
-                             self.packet_count.get_rate(self.packet_time.get_flow_duration(PacketDirection.REVERSE),
-                                                        PacketDirection.REVERSE),
-                             self.packet_count.get_total(PacketDirection.FORWARD),
-                             self.packet_count.get_total(PacketDirection.REVERSE),
-                             self.packet_length.get_max(),
-                             self.packet_length.get_min(),
-                             self.packet_length.get_mean(),
-                             self.packet_length.get_standard_deviation(),
-                             self.packet_length.get_variance(),
-                             self.packet_length.get_sum(PacketDirection.FORWARD),
-                             self.packet_length.get_max(PacketDirection.FORWARD),
-                             self.packet_length.get_min(PacketDirection.FORWARD),
-                             self.packet_length.get_mean(PacketDirection.FORWARD),
-                             self.packet_length.get_standard_deviation(PacketDirection.FORWARD),
-                             self.packet_length.get_sum(PacketDirection.REVERSE),
-                             self.packet_length.get_max(PacketDirection.REVERSE),
-                             self.packet_length.get_min(PacketDirection.REVERSE),
-                             self.packet_length.get_mean(PacketDirection.REVERSE),
-                             self.packet_length.get_standard_deviation(PacketDirection.REVERSE),
-                             self.flow_bytes.get_forward_header_bytes(),
-                             self.flow_bytes.get_reverse_header_bytes(),
-                             self.flow_bytes.get_min_forward_header_bytes(),
-                             self.packet_count.get_payload_count(PacketDirection.FORWARD),
-                             self.packet_time.get_mean(),
-                             self.packet_time.get_max(),
-                             self.packet_time.get_min(),
-                             self.packet_time.get_standard_deviation(),
-                             self.packet_time.get_sum(PacketDirection.FORWARD),
-                             self.packet_time.get_max(PacketDirection.FORWARD),
-                             self.packet_time.get_min(PacketDirection.FORWARD),
-                             self.packet_time.get_mean(PacketDirection.FORWARD),
-                             self.packet_time.get_standard_deviation(PacketDirection.FORWARD),
-                             self.packet_time.get_sum(PacketDirection.REVERSE),
-                             self.packet_time.get_max(PacketDirection.REVERSE),
-                             self.packet_time.get_min(PacketDirection.REVERSE),
-                             self.packet_time.get_mean(PacketDirection.REVERSE),
-                             self.packet_time.get_standard_deviation(PacketDirection.REVERSE),
-                             self.flag_count.flag_count("P", PacketDirection.FORWARD),
-                             self.flag_count.flag_count("P", PacketDirection.REVERSE),
-                             self.flag_count.flag_count("U", PacketDirection.FORWARD),
-                             self.flag_count.flag_count("U", PacketDirection.REVERSE),
-                             self.flag_count.flag_count("F"),
-                             self.flag_count.flag_count("S"),
-                             self.flag_count.flag_count("R"),
-                             self.flag_count.flag_count("P"),
-                             self.flag_count.flag_count("A"),
-                             self.flag_count.flag_count("U"),
-                             self.flag_count.flag_count("E"),
-                             self.packet_count.get_down_up_ratio(),
-                             self.packet_length.get_avg(),
-                             self.init_window_size[PacketDirection.FORWARD],
-                             self.init_window_size[PacketDirection.REVERSE],
-                             self.active_idle.active_stats.get_max(),
-                             self.active_idle.active_stats.get_min(),
-                             self.active_idle.active_stats.get_mean(),
-                             self.active_idle.active_stats.get_standard_deviation(),
-                             self.active_idle.idle_stats.get_max(),
-                             self.active_idle.idle_stats.get_min(),
-                             self.active_idle.idle_stats.get_mean(),
-                             self.active_idle.idle_stats.get_standard_deviation(),
-                             self.packet_bulk.get_bytes_per_bulk(PacketDirection.FORWARD),
-                             self.packet_bulk.get_packets_per_bulk(PacketDirection.FORWARD),
-                             self.packet_bulk.get_bytes_per_bulk(PacketDirection.REVERSE),
-                             self.packet_bulk.get_packets_per_bulk(PacketDirection.REVERSE),
-                             self.packet_bulk.get_bulk_rate(PacketDirection.FORWARD),
-                             self.packet_bulk.get_bulk_rate(PacketDirection.REVERSE)
-                             ]
-                     )
-                ]
 
     def __repr__(self) -> str:
 
