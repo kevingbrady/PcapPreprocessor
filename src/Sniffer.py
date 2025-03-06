@@ -9,11 +9,14 @@ import numpy as np
 import csv
 import torch
 from torch_geometric.data import Data
+from time import time, perf_counter
+from datetime import datetime
 
 
 class Sniffer:
     file_count = 0
     file_sizes = []
+    graph_write_file_count = 500
 
     def __init__(self, output_file):
 
@@ -27,6 +30,13 @@ class Sniffer:
         self.write_lock = manager.Lock()
         self.output_file = output_file
 
+    def packet_generator(self, file):
+
+        generator = enumerate(PcapReader(file))
+
+        for idx, pkt in generator:
+            yield idx, pkt
+
     def run_sniffer(self, file) -> int:
 
         logging.info('Parsing file: ' + file)
@@ -38,38 +48,60 @@ class Sniffer:
         if file.lower().__contains__('attack'):
             target = 1
 
-        packets = PcapReader(file)
         counter = PacketCounter()
         graph_snapshots = []
+        graph_snapshot_count = 0
         flow_meter = FlowMeterMetrics(output_mode="flow")
 
-        for pkt in packets:
+        start = 0
+        end = 0
+        time_step_per_second = 10
+        time_step = 1 / time_step_per_second
 
-            counter.packet_count_total += 1
+        for idx, pkt in self.packet_generator(file):
+
+            counter.packet_count_total = idx + 1
+
+            if idx == 0:
+                start = pkt.time
 
             if ('IP' in pkt) or ('IPv6' in pkt):
                 if ('TCP' in pkt) or ('UDP' in pkt):
                     self.index.value += 1
-                    flow, direction = flow_meter.process_packet(pkt)
-                    flow_metrics = flow.get_data(direction)
-                    #flow_metrics['Target'] = target
+                    flow_meter.process_packet(pkt)
 
-                    graph = Data(
-                        edge_index=torch.tensor([(a, b) for (a, b, c, d) in flow_meter.flows.keys()],
-                                                dtype=torch.long).t().contiguous(),
-                        edge_attr=torch.tensor([float(y) for x, y in flow_metrics.items() if x not in ['src_ip', 'dst_ip']])
-                    )
+                    if pkt.time - end >= time_step:
+                        #print(packet_time, packet_time - elapsed)
 
-                    graph.num_nodes = graph.edge_index.max().item() + 1
-                    graph_snapshots.append(graph)
+                        labels = [torch.ones(len(flow_meter.flows)), torch.zeros(len(flow_meter.flows))][target == 0]
+                                    
+                        graph = Data(
+                            edge_index=torch.tensor([(a, b) for (a, b, c, d) in flow_meter.flows.keys()]).t().contiguous(),
+                            edge_attr=torch.tensor([flow.get_data_as_list() for flow in flow_meter.flows.values()]),
+                            y=labels
+                        )
 
-                    print('Nodes: ', graph.num_nodes)
-                    print('Edges: ', graph.num_edges)
-                    print('Graph Snapshots: ', len(graph_snapshots))
-                    print('\n\n')
+                        graph.nodes = list(flow_meter.node_ids.keys())
+                        graph_snapshots.append(graph)
+                        graph_snapshot_count += 1
+                        end = pkt.time
+
+                        self.print_graph_details(graph, graph_snapshot_count)
+
+                        if graph_snapshot_count % self.graph_write_file_count == 0:
+                            graph_snapshots = self.write_data_to_file(graph_snapshots, graph_snapshot_count)
+
+
 
 
         # Append data to final CSV file
+        capture_time = datetime.fromtimestamp(float(end - start))
+        print('Capture time: ', capture_time.strftime("%M:%S"))
+
+        if len(graph_snapshots) > 0:
+            #self.print_graph_details(graph_snapshots[-1], graph_snapshot_count)
+            self.write_data_to_file(graph_snapshots, graph_snapshot_count)
+
         '''
         self.write_lock.acquire()
         self.write_data_to_csv(packet_data, self.output_file)
@@ -96,31 +128,26 @@ class Sniffer:
 
                 with ProcessPoolExecutor(max_tasks_per_child=1) as pool:
                     # Sort file_list by file size so the program processes the largest files first
-                    results = pool.map(self.run_sniffer, sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True))
+                    results = pool.map(self.run_sniffer, file_list)
 
             else:
                 results = [self.run_sniffer(file) for file in file_list]
 
         return results
 
-    def write_data_to_csv(self, data, output_file) -> None:
+    def write_data_to_file(self, graph_list, graph_total_count) -> list:
 
-        mode = 'w' if self.index.value == 0 else 'a'
+        op = ['wb', 'ab'][graph_total_count == self.graph_write_file_count]
+        with open(self.output_file, op) as f:
+            pickle.dump(graph_list, f)
 
-        with open(output_file, mode=mode, newline='') as csv_file:
+        return []
 
-            writer = csv.DictWriter(csv_file, fieldnames=columns.keys())
-            if mode == 'w':
-                writer.writeheader()
-
-            for key, group in data.items():
-                self.index.value += len(group)
-
-                for flow in group:
-                    for k in flow:
-                        if type(flow[k]) not in (str, int) and flow[k] > 0:
-                            flow[k] = format(flow[k], ".8f")
-                    writer.writerow(flow)
+    def print_graph_details(self, graph, graph_snapshot_count):
+        print('Nodes: ', graph.num_nodes)
+        print('Edges: ', graph.num_edges)
+        print('Graph Snapshots: ', graph_snapshot_count)
+        print('\n\n')
 
     def display_progress(self) -> None:
 
