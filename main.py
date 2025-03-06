@@ -48,11 +48,9 @@ if __name__ == '__main__':
                     file_path = root + '/' + file
                     file_list.append(file_path)
 
-        file_list = sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True)
-
         # Start ParallelSniffer with list of pcap files
 
-        results = sniffer_controller.start_sniffer(file_list[-5], parallel=False)
+        results = sniffer_controller.start_sniffer(file_list, parallel=True)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)
