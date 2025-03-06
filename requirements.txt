@@ -1,5 +1,3 @@
 python-utils
-conda-forge::scapy
+scapy
 simplejson
-pytorch
-pyg
