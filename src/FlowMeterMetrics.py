@@ -32,7 +32,7 @@ class FlowMeterMetrics:
 
         # Check flow in reverse direction
         direction = PacketDirection.REVERSE
-        #packet_flow_key = Flow.get_packet_flow_key(packet, direction)
+        # packet_flow_key = Flow.get_packet_flow_key(packet, direction)
 
         packet_flow_key = self.get_packet_flow_key(packet, direction)
 
@@ -48,12 +48,6 @@ class FlowMeterMetrics:
                 # If flow does not exist create new flow
                 flow = Flow(packet, direction)
                 self.flows[packet_flow_key] = flow
-
-        '''if flow.packet_time.get_latest_timestamp() > 0 and (packet.time - flow.packet_time.get_latest_timestamp()) > EXPIRED_UPDATE:
-            # If the packet exists in the flow but the packet is sent
-            # after too much of a delay than it is a part of a new flow.
-            flow = Flow(packet, direction)
-            self.flows[packet_flow_key] = flow'''
 
         if 'TCP' in packet:
             if "R" in str(packet['TCP'].flags):
@@ -81,10 +75,8 @@ class FlowMeterMetrics:
 
         flow.flow_sort(packet.time)
 
-        if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:   # or flow.packet_time.get_flow_duration() > 120:
+        if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:  # or flow.packet_time.get_flow_duration() > 120:
             self.garbage_collect(packet.time)
-
-        return flow, direction
 
     def garbage_collect(self, latest_time) -> None:
 
