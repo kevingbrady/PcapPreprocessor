@@ -4,7 +4,7 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 class FlowBytes:
     """Extracts features from the traffic related to the bytes in a flow"""
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         self.byte_data = {
             None: {
@@ -27,7 +27,7 @@ class FlowBytes:
             }
         }
 
-    def process_packet(self, packet, direction):
+    def process_packet(self, packet, direction) -> None:
 
         self.byte_data[None]['total_bytes'] += len(packet)
         self.byte_data[direction]['total_bytes'] += len(packet)

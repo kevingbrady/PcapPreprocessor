@@ -5,7 +5,7 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 
 class BulkPacketData:
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         self.forward_bulk_last_timestamp = 0
         self.forward_bulk_start_tmp = 0

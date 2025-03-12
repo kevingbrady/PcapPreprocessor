@@ -5,7 +5,7 @@ from scapy.packet import Raw, NoPayload
 class PacketCount:
     """This class extracts features related to the Packet Count."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.packet_count = {
             None: {
                 'count': 0,

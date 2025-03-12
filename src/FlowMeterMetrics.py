@@ -2,21 +2,48 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 from src.improved_flow import Flow
 from src.flow_meter_features.constants import EXPIRED_UPDATE, GARBAGE_COLLECT_PACKETS
 from collections import OrderedDict
+from dataclasses import dataclass
+
+
+@dataclass
+class FlowKey:
+    source_node_id: int
+    destination_node_id: int
+    source_port: int
+    destination_port: int
+
+    def __init__(self, source_node_id, destination_node_id, source_port, destination_port):
+        self.source_node_id = source_node_id
+        self.destination_node_id = destination_node_id
+        self.source_port = source_port
+        self.destination_port = destination_port
+
+    def __iter__(self):
+        yield self.source_node_id
+        yield self.destination_node_id
+        yield self.source_port
+        yield self.destination_port
+
+    def __eq__(self, other):
+        if not isinstance(other, FlowKey):
+            return NotImplemented
+        return (self.source_node_id, self.destination_node_id, self.source_port, self.destination_port) == (other.source_node_id, other.destination_node_id, other.source_port, other.destination_port)
+
+    def __hash__(self):
+        return hash((self.source_node_id, self.destination_node_id, self.source_port, self.destination_port))
 
 
 class FlowMeterMetrics:
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.flows = OrderedDict()
         self.node_ids = {}
         self.packet_count_total = 0
         self.output_mode = ''
 
-    def get_packet_flow_key(self, packet, direction):
+    def get_packet_flow_key(self, packet, direction) -> FlowKey:
 
-        packet_flow_info = Flow.get_flow_address_info(packet, direction)
-
-        src_ip, dst_ip, src_port, dst_port = packet_flow_info
+        src_ip, dst_ip, src_port, dst_port = Flow.get_flow_address_info(packet, direction)
 
         if src_ip not in self.node_ids.keys():
             self.node_ids.update({src_ip: len(self.node_ids)})
@@ -24,7 +51,7 @@ class FlowMeterMetrics:
         if dst_ip not in self.node_ids.keys():
             self.node_ids.update({dst_ip: len(self.node_ids)})
 
-        return self.node_ids[src_ip], self.node_ids[dst_ip], int(src_port), int(dst_port)
+        return FlowKey(self.node_ids[src_ip], self.node_ids[dst_ip], src_port, dst_port)
 
     def process_packet(self, packet) -> (Flow, PacketDirection):
 
@@ -32,10 +59,7 @@ class FlowMeterMetrics:
 
         # Check flow in reverse direction
         direction = PacketDirection.REVERSE
-        #packet_flow_key = Flow.get_packet_flow_key(packet, direction)
-
         packet_flow_key = self.get_packet_flow_key(packet, direction)
-
         flow = self.flows.get(packet_flow_key)
 
         if flow is None:
@@ -81,7 +105,7 @@ class FlowMeterMetrics:
 
         flow.flow_sort(packet.time)
 
-        if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:   # or flow.packet_time.get_flow_duration() > 120:
+        if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:  # or flow.packet_time.get_flow_duration() > 120:
             self.garbage_collect(packet.time)
 
         return flow, direction

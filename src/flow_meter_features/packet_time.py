@@ -6,7 +6,7 @@ from .stats import Statistics
 class PacketTime(Statistics):
     """This class extracts features related to the Packet Times."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.timestamps = {
             None: {
                 'first_timestamp': 0,

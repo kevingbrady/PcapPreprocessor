@@ -4,7 +4,7 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 class FlagCount:
     """This class extracts features related to the Flags Count."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.flags = {
             None: {
                 "F": 0,  # FIN

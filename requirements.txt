@@ -1,5 +1,4 @@
-python-utils
 conda-forge::scapy
 simplejson
-pytorch
+# PYG will install pytorch
 pyg

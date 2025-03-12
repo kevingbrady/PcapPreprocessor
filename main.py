@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
 
     # Initialize Sniffer Controller Object
-    sniffer_controller = Sniffer(gl_args.output_file)
+    sniffer_controller = Sniffer(gl_args.output_directory)
 
     packet_data = []
 
@@ -37,7 +37,8 @@ if __name__ == '__main__':
     elif gl_args.input_directory:
 
         logging.info('Directory Parsing Started at: ' + gl_args.input_directory + '/')
-        print('Directory Parsing Started at: ' + gl_args.input_directory + '/')
+        #print('Directory Parsing Started at: ' + gl_args.input_directory + '/')
+        #print("\n\n")
 
         # Create a loop that finds all pcap files starting at rootPath, all subdirectories will also be processed
 
@@ -48,11 +49,11 @@ if __name__ == '__main__':
                     file_path = root + '/' + file
                     file_list.append(file_path)
 
+        # Sort files by size with the largest files at the front of the list
         file_list = sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True)
 
         # Start ParallelSniffer with list of pcap files
-
-        results = sniffer_controller.start_sniffer(file_list[-5], parallel=False)
+        results = sniffer_controller.start_sniffer(file_list[-1], parallel=True)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)

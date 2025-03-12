@@ -14,12 +14,33 @@ from src.flow_meter_features.packet_length import PacketLength
 from src.flow_meter_features.active_idle import ActiveIdle
 from src.flow_meter_features.packet_bulk import BulkPacketData
 from src.clean_ip import _format_ip
+from dataclasses import dataclass
+
+
+@dataclass
+class FlowInfo:
+    source_ip: str
+    destination_ip: str
+    source_port: int
+    destination_port: int
+
+    def __init__(self, source_ip, destination_ip, source_port, destination_port):
+        self.source_ip = source_ip
+        self.destination_ip = destination_ip
+        self.source_port = int(source_port)
+        self.destination_port = int(destination_port)
+
+    def __iter__(self):
+        yield self.source_ip
+        yield self.destination_ip
+        yield self.source_port
+        yield self.destination_port
 
 
 class Flow:
     """This class summarizes the values of the features of the network flows"""
 
-    def __init__(self, packet: Any, direction: Enum):
+    def __init__(self, packet: Any, direction: Enum) -> None:
         """This method initializes an object from the Flow class.
 
         Args:
@@ -55,7 +76,7 @@ class Flow:
         self.prediction = None
 
     @staticmethod
-    def get_flow_address_info(packet, direction) -> (str, str, int, int):
+    def get_flow_address_info(packet, direction) -> FlowInfo:
 
         ip = 'IPv6' if 'IPv6' in packet else 'IP'
 
@@ -73,12 +94,13 @@ class Flow:
             src_port = packet[protocol].sport
             dst_port = packet[protocol].dport
         else:
+
             dst_ip = packet[ip].src
             src_ip = packet[ip].dst
             src_port = packet[protocol].dport
             dst_port = packet[protocol].sport
 
-        return src_ip, dst_ip, src_port, dst_port
+        return FlowInfo(src_ip, dst_ip, src_port, dst_port)
 
     '''
     @staticmethod
@@ -241,7 +263,7 @@ class Flow:
             self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
             self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
 
-    def get_data_as_list(self, direction=None):
+    def get_data_as_list(self, direction=None) -> list:
 
         return [*map(float, [self.src_port,
                              self.dst_port,

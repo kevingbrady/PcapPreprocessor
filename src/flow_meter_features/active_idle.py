@@ -4,7 +4,7 @@ from src.flow_meter_features import constants
 
 class ActiveIdle:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = 0.0
         self.idle = 0.0
         self.start_active = 0.0

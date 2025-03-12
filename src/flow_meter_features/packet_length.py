@@ -4,7 +4,7 @@ from src.flow_meter_features.context.packet_direction import PacketDirection
 
 class PacketLength(Statistics):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.packet_lengths = {
             None: 0,
             PacketDirection.FORWARD: 0,

@@ -7,7 +7,7 @@ class Statistics:
     '''
     Use Welford's algorithm to calculate moving mean and variance to keep statistics info for all flow metrics
     '''
-    def __init__(self):
+    def __init__(self) -> None:
         self.data = {
             None: {
                 'count': 0,
