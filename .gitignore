@@ -4,5 +4,6 @@ Data_Research/
 preprocessedData.csv
 preprocessedData_noIPv6.csv
 PcapPreprocessor.log
+NetworkIntrusion.db
 __pycache__
 .idea/
