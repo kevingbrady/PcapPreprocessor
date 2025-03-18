@@ -17,7 +17,7 @@ class Sniffer:
     file_count = 0
     graph_write_file_count = 2000
 
-    def __init__(self, output_directory) -> None:
+    def __init__(self, db_name) -> None:
 
         manager = Manager()
         self.completed = manager.list()
@@ -27,12 +27,12 @@ class Sniffer:
         self.index = manager.Value('i', 0)
         self.total_graph_snapshots = manager.Value('i', 0)
 
-        self.output_directory = os.path.abspath(output_directory)
+        self.db_name = db_name
         self.display_output = ''
 
     def run_sniffer(self, file) -> int:
 
-        db = DatabaseAPI('NetworkIntrusion.db')
+        db = DatabaseAPI(self.db_name + '.db')
         db.connect()
 
         logging.info('Parsing file: ' + file)

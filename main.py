@@ -1,13 +1,14 @@
 import os
 import time
 import logging
+import warnings
 from src.Sniffer import Sniffer
-#from src.CsvWriter import CsvWriter
 
 from src import utils
-from scapy.all import rdpcap
 
 logging.raiseExceptions = True
+warnings.filterwarnings('ignore')
+
 
 if __name__ == '__main__':
 
@@ -25,7 +26,7 @@ if __name__ == '__main__':
 
 
     # Initialize Sniffer Controller Object
-    sniffer_controller = Sniffer(gl_args.output_directory)
+    sniffer_controller = Sniffer(gl_args.output_database_name)
 
     packet_data = []
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
         file_list = sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True)
 
         # Start ParallelSniffer with list of pcap files
-        results = sniffer_controller.start_sniffer(file_list[-1], parallel=True)
+        results = sniffer_controller.start_sniffer(file_list, parallel=True)
 
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)

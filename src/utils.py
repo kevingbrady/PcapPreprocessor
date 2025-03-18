@@ -15,7 +15,7 @@ def parse_command_line() -> Namespace:
                         type=check_file)
     group.add_argument('-r', '--input_directory', help='Input directory of PCAP Files to be parsed and converted to CSV',
                         type=check_directory)
-    parser.add_argument('-o', '--output_directory', help='Name of output directory for graph data files to be written', required=True)
+    parser.add_argument('-o', '--output_database_name', help='Name of output sqlite database for graph data files to be written', required=True)
     gl_args = parser.parse_args()
 
     return gl_args
