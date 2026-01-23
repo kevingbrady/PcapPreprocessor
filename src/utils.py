@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 from argparse import ArgumentParser, ArgumentError, ArgumentTypeError, Namespace
 
 log = logging.getLogger('main.utils')
@@ -56,3 +57,10 @@ def pretty_time_delta(seconds) -> str:
         return '%dm %ds' % (minutes, seconds)
     else:
         return '%ds' % (seconds,)
+
+
+def generate_unique_integers(n):
+    if n < 1:
+        return []
+    population = range(1, n + 1)
+    return random.sample(population, k=n)

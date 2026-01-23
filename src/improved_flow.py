@@ -13,22 +13,17 @@ from src.flow_meter_features.packet_time import PacketTime
 from src.flow_meter_features.packet_length import PacketLength
 from src.flow_meter_features.active_idle import ActiveIdle
 from src.flow_meter_features.packet_bulk import BulkPacketData
+from src.flow_meter_features.constants import EXPIRED_UPDATE, GARBAGE_COLLECT_PACKETS
 from src.clean_ip import _format_ip
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class FlowInfo:
     source_ip: str
     destination_ip: str
     source_port: int
     destination_port: int
-
-    def __init__(self, source_ip, destination_ip, source_port, destination_port):
-        self.source_ip = source_ip
-        self.destination_ip = destination_ip
-        self.source_port = int(source_port)
-        self.destination_port = int(destination_port)
 
     def __iter__(self):
         yield self.source_ip
@@ -54,7 +49,6 @@ class Flow:
             self.src_port,
             self.dst_port
         ) = self.get_flow_address_info(packet, direction)
-        # self.key = self.get_packet_flow_key(packet, direction)
 
         self.direction = direction
         self.ack = 0
@@ -72,6 +66,7 @@ class Flow:
         self.packet_time = PacketTime()
         self.active_idle = ActiveIdle()
         self.duration = 0.0
+        self.num_features = len(self.get_data())
         self.completed = False
         self.prediction = None
 
@@ -116,9 +111,11 @@ class Flow:
 
     '''
 
-    def flow_sort(self, packet_time) -> float:
+    def update_flow_duration(self, packet_time) -> None:
         self.duration = packet_time - self.packet_time.get_first_timestamp()
-        return self.duration
+
+        if self.duration > EXPIRED_UPDATE:
+            self.completed = True
 
     def get_data(self, direction=None) -> dict:
         """This method obtains the values of the features extracted from each flow.

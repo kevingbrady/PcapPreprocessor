@@ -1,4 +1,8 @@
 conda-forge::scapy
-simplejson
-torch
+simplejson~=3.19.2
+torch~=2.6.0
 pyg
+scapy~=2.6.1
+numpy~=1.26.4
+lz4~=4.4.5
+psutil~=7.0.0

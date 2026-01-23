@@ -7,7 +7,7 @@ from src.Sniffer import Sniffer
 from src import utils
 
 logging.raiseExceptions = True
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 if __name__ == '__main__':

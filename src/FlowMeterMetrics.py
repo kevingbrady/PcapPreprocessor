@@ -5,18 +5,12 @@ from collections import OrderedDict
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class FlowKey:
     source_node_id: int
     destination_node_id: int
     source_port: int
     destination_port: int
-
-    def __init__(self, source_node_id, destination_node_id, source_port, destination_port):
-        self.source_node_id = source_node_id
-        self.destination_node_id = destination_node_id
-        self.source_port = source_port
-        self.destination_port = destination_port
 
     def __iter__(self):
         yield self.source_node_id
@@ -27,7 +21,8 @@ class FlowKey:
     def __eq__(self, other):
         if not isinstance(other, FlowKey):
             return NotImplemented
-        return (self.source_node_id, self.destination_node_id, self.source_port, self.destination_port) == (other.source_node_id, other.destination_node_id, other.source_port, other.destination_port)
+        return (self.source_node_id, self.destination_node_id, self.source_port, self.destination_port) == (
+            other.source_node_id, other.destination_node_id, other.source_port, other.destination_port)
 
     def __hash__(self):
         return hash((self.source_node_id, self.destination_node_id, self.source_port, self.destination_port))
@@ -73,23 +68,15 @@ class FlowMeterMetrics:
                 flow = Flow(packet, direction)
                 self.flows[packet_flow_key] = flow
 
-        '''if flow.packet_time.get_latest_timestamp() > 0 and (packet.time - flow.packet_time.get_latest_timestamp()) > EXPIRED_UPDATE:
-            # If the packet exists in the flow but the packet is sent
-            # after too much of a delay than it is a part of a new flow.
-            flow = Flow(packet, direction)
-            self.flows[packet_flow_key] = flow'''
-
         if 'TCP' in packet:
             if "R" in str(packet['TCP'].flags):
-                # If it has an RST flag then early collect flow and continue
+                # If it has an RST flag then flow is completed
                 flow.completed = True
-                self.garbage_collect(packet.time)
 
             if "A" in str(packet['TCP'].flags):
                 if (flow.flag_count.flag_count('F', PacketDirection.FORWARD) >= 1
                         and flow.flag_count.flag_count('F', PacketDirection.REVERSE) >= 1):
                     flow.completed = True
-                    self.garbage_collect(packet.time)
 
             flow.ack = packet['TCP'].ack
             flow.set_window_size(packet, direction)
@@ -103,15 +90,58 @@ class FlowMeterMetrics:
         flow.flow_bytes.process_packet(packet, direction)
         flow.flag_count.process_packet(packet, direction)
 
-        flow.flow_sort(packet.time)
+        # if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:  # or flow.packet_time.get_flow_duration() > 120:
 
-        if (self.packet_count_total % GARBAGE_COLLECT_PACKETS) == 0:  # or flow.packet_time.get_flow_duration() > 120:
-            self.garbage_collect(packet.time)
+        self.garbage_collect(packet.time)
 
         return flow, direction
 
-    def garbage_collect(self, latest_time) -> None:
+    def get_flows_as_list(self, start_timestamp=-1, end_timestamp=-1):
 
+        if start_timestamp != -1 and end_timestamp != -1:
+            flow_list = []
+            for flow in self.flows.values():
+                #print(start_timestamp, t, end_timestamp)
+                if start_timestamp <= flow.packet_time.get_latest_timestamp() <= end_timestamp:
+                    flow_list.append(flow.get_data_as_list())
+                else:
+
+                    flow_list.append([0] * (flow.num_features - 2))  # Don't include src_ip or dst_ip
+
+            #print(*flow_list, end='\n\n')
+            return flow_list
+
+        else:
+            return [self.flows[key].get_data_as_list() for key in self.flows]
+
+    def get_flow_index(self, flow_key):
+
+        for idx, key in enumerate(self.flows.keys()):
+            if key == flow_key:
+                return idx
+        return -1
+
+    def completed_flows(self, latest_time) -> list:
+        completed_flows = []
+
+        for key, flow in self.flows.items():
+            flow.update_flow_duration(latest_time)
+            if flow.completed:
+                completed_flows.append(key)
+
+        return completed_flows
+
+    def garbage_collect(self, latest_time) -> None:
+        for key in self.completed_flows(latest_time):
+            self.flows.pop(key)
+
+        '''
+        for key in self.completed_flows(latest_time):
+            print(key)
+            self.flows.pop(key)
+    
+        
         self.flows = {key: flow for key, flow in self.flows.items() if
                       (latest_time - flow.packet_time.get_latest_timestamp()) <= EXPIRED_UPDATE
                       and flow.completed is False}
+        '''

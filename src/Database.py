@@ -1,74 +1,77 @@
-import sqlite3
+from src.DatabaseConnection import DatabaseConnection
+from torch_geometric.data import Data
+from src.utils import generate_unique_integers
+from torch_geometric.data.data import BaseData
+from typing import Any
+
+import lzma
+import zlib
+import pickle
+import os
+import sys
 
 
-class DatabaseAPI:
+class GraphDataset:
     def __init__(self, db_name):
         self.db_name = db_name
-        self.conn = None
-        self.cursor = None
+        self.db_full_path = './' + self.db_name + '/processed/'
+        self.db_table_name = 'GraphDataset_unordered'
+        self.db_columns = {
+            'serialized_graph_list': 'BLOB',
+            'graph_count': 'INT',
+            'timestamp': 'FLOAT',
+            'filename': 'TEXT'
+        }
 
-    def connect(self):
-        try:
-            self.conn = sqlite3.connect(self.db_name)
-            self.cursor = self.conn.cursor()
-            #print(f"Connected to database: {self.db_name}")
-            #print(self.conn.execute("SELECT file FROM pragma_database_list WHERE name = 'main';").fetchone()[0])
-        except sqlite3.Error as e:
-            print(f"Error connecting to database: {e}")
+        os.makedirs(self.db_full_path, exist_ok=True)
 
-    def disconnect(self):
-        if self.conn:
-            self.cursor.close()
-            self.conn.close()
-            #print("Disconnected from database")
+        conn = self.connect()
+        conn.delete_table(self.db_table_name)
+        conn.delete_table(self.db_table_name.replace('_unordered', ''))
+        conn.create_table(self.db_table_name, self.db_columns)
 
-    def execute_query(self, query, params=()):
-        try:
-            self.cursor.execute(query, params)
-            self.conn.commit()
-            return self.cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Error executing query: {e}")
-            print(query, end='\n\n')
-            return None
+    def reorder_table_final(self):
+        conn = self.connect()
+        table_name = self.db_table_name.replace('_unordered', '')
 
-    def execute_multi_query(self, query, data_list, params=()):
-        try:
-            self.cursor.executemany(query, data_list)
-            self.conn.commit()
-            return self.cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Error executing query: {e}")
-            return None
+        conn.create_table(table_name, self.db_columns)
 
-    def create_table(self, table_name, columns):
-        column_definitions = ", ".join([f"{name} {data_type}" for name, data_type in columns.items()])
-        query = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({column_definitions});'
-        self.execute_query(query)
+        columns = ", ".join([f"{name}" for name in self.db_columns.keys()])
+        query = f'INSERT INTO {table_name} SELECT {columns} FROM {self.db_table_name} ORDER BY timestamp, filename;'
+        conn.execute_query(query)
+        conn.delete_table(self.db_table_name)
 
-    def insert_data(self, table_name, data):
+    @staticmethod
+    def serialize(graph_list: list, graph_count: int, timestamp: float, filename: str) -> {Any, float, str}:
+        serialized_graph_list = lzma.compress(pickle.dumps(graph_list))
+        return {
+            'serialized_graph_list': serialized_graph_list,
+            'graph_count': graph_count,
+            'timestamp': float(timestamp),
+            'filename': filename
+        }
 
-        query = f'INSERT INTO "{table_name}" (graphs, timestamp) VALUES (?, ?)'
-        self.execute_multi_query(query, data)
+    @staticmethod
+    def deserialize(data: [Any, int, float, str]) -> [list, int, float, str]:
+        return {
+            'graph_list': pickle.loads(lzma.decompress(data['graph'])),
+            'graph_count': int(data['graph_count']),
+            'timestamp': float(data['timestamp']),
+            'filename': str(data['filename'])
+        }
 
-    def select_data(self, table_name, columns="*", condition=None):
-        query = f"SELECT {columns} FROM {table_name}"
-        if condition:
-            query += f" WHERE {condition}"
-        return self.execute_query(query)
+    def estimate_compressed_size(self, graph_snapshots):
+        if len(graph_snapshots) < 100:
+            return
 
-    def update_data(self, table_name, data, condition):
-        set_values = ", ".join([f"{key} = ?" for key in data.keys()])
-        query = f"UPDATE {table_name} SET {set_values} WHERE {condition}"
-        self.execute_query(query, tuple(data.values()))
+        N = 80
+        sample = [graph_snapshots[i] for i in generate_unique_integers(N)]
+        # uncompressed_size = sys.getsizeof(graph_snapshots)
 
-    def delete_data(self, table_name, condition):
-        query = f"DELETE FROM {table_name} WHERE {condition}"
-        self.execute_query(query)
+        sample = lzma.compress(pickle.dumps(sample))
+        estimated_compressed_size = (sys.getsizeof(sample) / N) * len(graph_snapshots)
 
-    def table_exists(self, table_name):
-        db_table_exists = self.execute_query(
-            f'SELECT * FROM sqlite_master WHERE type="table" and name="{table_name}";')
-        if len(db_table_exists) > 0:
-            return True
-        return False
+        return estimated_compressed_size
+
+    def connect(self) -> DatabaseConnection:
+        return DatabaseConnection(self.db_full_path + 'sqlite.db')
