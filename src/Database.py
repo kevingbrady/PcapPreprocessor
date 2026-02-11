@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.DatabaseConnection import DatabaseConnection
 from torch_geometric.data import Data
 from src.utils import generate_unique_integers
@@ -15,11 +17,12 @@ class GraphDataset:
     def __init__(self, db_name):
         self.db_name = db_name
         self.db_full_path = './' + self.db_name + '/processed/'
-        self.db_table_name = 'GraphDataset_unordered'
+        self.db_table_name = 'GraphDataset'
         self.db_columns = {
-            'serialized_graph_list': 'BLOB',
-            'graph_count': 'INT',
-            'timestamp': 'FLOAT',
+            'graph': 'BLOB',
+            'nodes': 'INT',
+            'edges': 'INT',
+            'timestamp': 'REAL',
             'filename': 'TEXT'
         }
 
@@ -27,38 +30,39 @@ class GraphDataset:
 
         conn = self.connect()
         conn.delete_table(self.db_table_name)
-        conn.delete_table(self.db_table_name.replace('_unordered', ''))
         conn.create_table(self.db_table_name, self.db_columns)
 
-    def reorder_table_final(self):
-        conn = self.connect()
-        table_name = self.db_table_name.replace('_unordered', '')
+    @staticmethod
+    def serialize(graph: Data, filename: str) -> tuple[Any, int, int, float, str]:
+        serialized_graph = lzma.compress(pickle.dumps(graph))
+        return serialized_graph, graph.num_nodes, graph.num_edges, graph.timestamp, filename
 
-        conn.create_table(table_name, self.db_columns)
-
-        columns = ", ".join([f"{name}" for name in self.db_columns.keys()])
-        query = f'INSERT INTO {table_name} SELECT {columns} FROM {self.db_table_name} ORDER BY timestamp, filename;'
-        conn.execute_query(query)
-        conn.delete_table(self.db_table_name)
 
     @staticmethod
-    def serialize(graph_list: list, graph_count: int, timestamp: float, filename: str) -> {Any, float, str}:
+    def deserialize(row: tuple[Any, int, int, float, str]) -> Any:
+
+            return pickle.loads(lzma.decompress(row[0]))
+
+
+    '''
+    @staticmethod
+    def serialize(graph_list: list, graph_count: int, filename: str) -> {Any, int, str}:
         serialized_graph_list = lzma.compress(pickle.dumps(graph_list))
         return {
             'serialized_graph_list': serialized_graph_list,
             'graph_count': graph_count,
-            'timestamp': float(timestamp),
             'filename': filename
         }
 
     @staticmethod
-    def deserialize(data: [Any, int, float, str]) -> [list, int, float, str]:
+    def deserialize(row: (Any, int, str)) -> {list, int, str}:
         return {
-            'graph_list': pickle.loads(lzma.decompress(data['graph'])),
-            'graph_count': int(data['graph_count']),
-            'timestamp': float(data['timestamp']),
-            'filename': str(data['filename'])
+            'graph_list': pickle.loads(lzma.decompress(row[0])),
+            'graph_count': int(row[1]),
+            'filename': row[2]
         }
+        
+    '''
 
     def estimate_compressed_size(self, graph_snapshots):
         if len(graph_snapshots) < 100:

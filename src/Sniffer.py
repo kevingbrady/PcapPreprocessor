@@ -1,12 +1,10 @@
-import os
-import lzma
 from scapy.all import *
 from src.PacketCounter import PacketCounter
 from src.FlowMeterMetrics import FlowMeterMetrics
 from src.utils import pretty_time_delta
 from src.Database import GraphDataset
 from multiprocessing import Manager
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 from torch_geometric.data import Data
 
@@ -14,7 +12,7 @@ from torch_geometric.data import Data
 class Sniffer:
     file_count = 0
     graph_write_file_count = 5000
-    max_blob_size = 1000000000
+    #max_blob_size = 1000000000
 
     def __init__(self, db_name) -> None:
 
@@ -43,56 +41,53 @@ class Sniffer:
             target = 1
 
         counter = PacketCounter()
-        graph = Data(
-            edge_index=torch.tensor([]),
-            edge_attr=torch.tensor([])
-        )
 
         graph_snapshots = []
-        graph_snapshot_size = 0
         graph_snapshot_count = 0
+        graph_snapshot_size = 0
         flow_meter = FlowMeterMetrics(output_mode="flow")
 
-        start = 0
-        end = 0
-        packet_timestamp = 0
+        last_packet_timestamp = 0
         time_steps_per_second = 5
         time_step = 1 / time_steps_per_second
-        # time_step = 5
-        # packet_times = []
 
         for pkt in PcapReader(file):
 
             counter.packet_count_total += 1
-
-            if counter.packet_count_total == 0:
-                start = pkt.time
-
-            packet_timestamp = pkt.time
 
             if ('IP' in pkt) or ('IPv6' in pkt):
                 if ('TCP' in pkt) or ('UDP' in pkt):
                     counter.packet_count_preprocessed += 1
                     flow_meter.process_packet(pkt)
 
-            if packet_timestamp - end >= time_step:
+            if pkt.time - last_packet_timestamp >= time_step:
 
-                graph.edge_index = torch.tensor([(a, b) for (a, b, c, d) in flow_meter.flows.keys()]).t().contiguous()
-                graph.edge_attr = torch.tensor(flow_meter.get_flows_as_list(pkt.time - time_step, pkt.time))
-                graph.y = [torch.ones(len(flow_meter.flows)), torch.zeros(len(flow_meter.flows))][target == 0]
+                nodes = list(flow_meter.node_ids.keys())
 
-                graph.nodes = list(flow_meter.node_ids.keys())
-                graph.num_nodes = len(graph.nodes)         # PyG Transforms need this graph attribute listed as num_nodes
-                graph.timestamp = packet_timestamp
+                graph = Data(
+                    edge_index=torch.tensor([(a, b) for (a, b, c, d) in flow_meter.flows.keys()]).t().contiguous(),
+                    edge_attr=torch.tensor(flow_meter.get_flows_as_list(pkt.time - time_step, pkt.time)),
+                    y=[torch.ones(len(flow_meter.flows)), torch.zeros(len(flow_meter.flows))][target == 0],
+                    nodes=nodes,
+                    num_nodes=len(nodes),       # PyG Transforms need this graph attribute listed as num_nodes
+                    timestamp=float(pkt.time),
+                )
 
-                graph_snapshots.append(graph)
+                graph_snapshots.append(GraphDataset.serialize(graph, base_filename))
                 graph_snapshot_count += 1
                 # self.print_graph_details(graph, graph_snapshot_count)
-                #if len(graph_snapshots) >= self.graph_write_file_count:
 
+                last_packet_timestamp = pkt.time
+
+                if len(graph_snapshots) >= self.graph_write_file_count:
+                    with self.lock:
+                        conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)
+
+                    graph_snapshots = []
+                '''
                 if graph_snapshot_count % 5000 == 0:
                     graph_snapshot_size = self.db.estimate_compressed_size(graph_snapshots)
-                   #print(graph_snapshot_size, self.max_blob_size)
+                # print(graph_snapshot_size, self.max_blob_size)
 
                 if graph_snapshot_size >= (self.max_blob_size - 100000):
                     with self.lock:
@@ -101,16 +96,11 @@ class Sniffer:
                         conn.insert_binary_data(
                             self.db.db_table_name,
                             self.db.db_columns,
-                            GraphDataset.serialize(
-                                graph_snapshots,
-                                graph_snapshot_count,
-                                packet_timestamp,
-                                base_filename
-                            )
+                            GraphDataset.serialize(graph_snapshots, graph_snapshot_count, base_filename)
                         )
                     graph_snapshots = []
-
-                end = packet_timestamp
+                    
+                
 
         if len(graph_snapshots) > 0:
             with self.lock:
@@ -118,13 +108,13 @@ class Sniffer:
                 conn.insert_binary_data(
                     self.db.db_table_name,
                     self.db.db_columns,
-                    GraphDataset.serialize(
-                        graph_snapshots,
-                        graph_snapshot_count,
-                        packet_timestamp,
-                        base_filename
-                    )
+                    GraphDataset.serialize(graph_snapshots, graph_snapshot_count, base_filename)
                 )
+                
+            '''
+        if len(graph_snapshots) > 0:
+            with self.lock:
+                conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)
 
         self.index.value += counter.packet_count_preprocessed
         self.total_packets.value += counter.packet_count_total
@@ -148,9 +138,8 @@ class Sniffer:
                 futures = []
 
                 with ProcessPoolExecutor(max_tasks_per_child=1) as pool:
-                    #results = pool.map(self.run_sniffer, file_list)
-                    for i in file_list:
 
+                    for i in file_list:
                         logging.info('Parsing file: ' + i)
 
                         self.in_progress.append(i)
@@ -158,7 +147,6 @@ class Sniffer:
                         futures.append(pool.submit(self.run_sniffer, i))
 
                     for future in as_completed(futures):
-
                         file = future.result()
                         self.in_progress.remove(str(file))
                         self.completed.append(str(file))
@@ -170,7 +158,6 @@ class Sniffer:
             else:
                 results = [self.run_sniffer(file) for file in file_list]
 
-        self.db.reorder_table_final()
         return results
 
     @staticmethod

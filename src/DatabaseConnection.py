@@ -35,8 +35,6 @@ class DatabaseConnection:
 
     def execute_multi_query(self, query, data_list, params=()):
         try:
-            print(query)
-            print(data_list)
             self.cursor.executemany(query, data_list)
             self.conn.commit()
             return self.cursor.fetchall()
