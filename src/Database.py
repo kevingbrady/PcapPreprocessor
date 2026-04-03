@@ -17,7 +17,7 @@ class GraphDataset:
     def __init__(self, db_name):
         self.db_name = db_name
         self.db_full_path = './' + self.db_name + '/processed/'
-        self.db_table_name = 'GraphDataset'
+        self.db_table_name = 'SparseGraphDataset'
         self.db_columns = {
             'graph': 'BLOB',
             'nodes': 'INT',
@@ -35,34 +35,13 @@ class GraphDataset:
     @staticmethod
     def serialize(graph: Data, filename: str) -> tuple[Any, int, int, float, str]:
         serialized_graph = lzma.compress(pickle.dumps(graph))
-        return serialized_graph, graph.num_nodes, graph.num_edges, graph.timestamp, filename
+        return serialized_graph, graph.num_nodes, graph.num_edges, graph.t, filename
 
 
     @staticmethod
     def deserialize(row: tuple[Any, int, int, float, str]) -> Any:
 
             return pickle.loads(lzma.decompress(row[0]))
-
-
-    '''
-    @staticmethod
-    def serialize(graph_list: list, graph_count: int, filename: str) -> {Any, int, str}:
-        serialized_graph_list = lzma.compress(pickle.dumps(graph_list))
-        return {
-            'serialized_graph_list': serialized_graph_list,
-            'graph_count': graph_count,
-            'filename': filename
-        }
-
-    @staticmethod
-    def deserialize(row: (Any, int, str)) -> {list, int, str}:
-        return {
-            'graph_list': pickle.loads(lzma.decompress(row[0])),
-            'graph_count': int(row[1]),
-            'filename': row[2]
-        }
-        
-    '''
 
     def estimate_compressed_size(self, graph_snapshots):
         if len(graph_snapshots) < 100:

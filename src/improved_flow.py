@@ -18,24 +18,10 @@ from src.clean_ip import _format_ip
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
-class FlowInfo:
-    source_ip: str
-    destination_ip: str
-    source_port: int
-    destination_port: int
-
-    def __iter__(self):
-        yield self.source_ip
-        yield self.destination_ip
-        yield self.source_port
-        yield self.destination_port
-
-
 class Flow:
     """This class summarizes the values of the features of the network flows"""
 
-    def __init__(self, packet: Any, direction: Enum) -> None:
+    def __init__(self, flow_key: Any) -> None:
         """This method initializes an object from the Flow class.
 
         Args:
@@ -44,13 +30,12 @@ class Flow:
         """
 
         (
-            self.src_ip,
-            self.dst_ip,
-            self.src_port,
-            self.dst_port
-        ) = self.get_flow_address_info(packet, direction)
+            self.source,
+            self.destination,
+            self.source_port,
+            self.destination_port
+        ) = flow_key
 
-        self.direction = direction
         self.ack = 0
         self.protocol = 0
         self.init_window_size = {
@@ -70,54 +55,15 @@ class Flow:
         self.completed = False
         self.prediction = None
 
-    @staticmethod
-    def get_flow_address_info(packet, direction) -> FlowInfo:
-
-        ip = 'IPv6' if 'IPv6' in packet else 'IP'
-
-        if 'TCP' in packet:
-            protocol = 'TCP'
-        elif 'UDP' in packet:
-            protocol = 'UDP'
-        else:
-            raise Exception("Only TCP protocols are supported.")
-
-        if direction == PacketDirection.FORWARD:
-
-            dst_ip = packet[ip].dst
-            src_ip = packet[ip].src
-            src_port = packet[protocol].sport
-            dst_port = packet[protocol].dport
-        else:
-
-            dst_ip = packet[ip].src
-            src_ip = packet[ip].dst
-            src_port = packet[protocol].dport
-            dst_port = packet[protocol].sport
-
-        return FlowInfo(src_ip, dst_ip, src_port, dst_port)
-
-    '''
-    @staticmethod
-    def get_packet_flow_key(packet, direction) -> str:
-
-        hasher = hashlib.sha256()
-
-        for value in Flow.get_flow_address_info(packet, direction):
-            hasher.update(str(value).encode('utf-8'))
-
-        flow_key = hasher.hexdigest()
-        return flow_key
-
-    '''
-
-    def update_flow_duration(self, packet_time) -> None:
+    def update_flow_duration(self, packet_time: float) -> bool:
         self.duration = packet_time - self.packet_time.get_first_timestamp()
 
-        if self.duration > EXPIRED_UPDATE:
+        if self.duration >= EXPIRED_UPDATE:
             self.completed = True
 
-    def get_data(self, direction=None) -> dict:
+        return self.completed
+
+    def get_data(self, direction: PacketDirection=None) -> dict:
         """This method obtains the values of the features extracted from each flow.
 
         Note:
@@ -136,10 +82,12 @@ class Flow:
 
         data = {
             # Basic IP information
-            "src_ip": self.src_ip,
-            "dst_ip": self.dst_ip,
-            "src_port": self.src_port,
-            "dst_port": self.dst_port,
+            "src_node_id": self.source[0],
+            "dst_node_id": self.destination[0],
+            "src_ip": self.source[1],
+            "dst_ip": self.destination[1],
+            "src_port": self.source_port,
+            "dst_port": self.destination_port,
             "protocol": self.protocol,
             "pkt_length": self.packet_length.packet_lengths[direction],
             "info": self.ack,
@@ -237,12 +185,12 @@ class Flow:
 
         return data
 
-    def set_window_size(self, packet, direction) -> None:
+    def set_window_size(self, packet: Any, direction: PacketDirection) -> None:
 
         if self.init_window_size[direction] == 0:
             self.init_window_size[direction] = packet['TCP'].window
 
-    def get_protocol(self, packet) -> None:
+    def get_protocol(self, packet: Any) -> None:
 
         # if self.packet_time.timestamps[None]['first_timestamp'] == 0:
         if 'TCP' in packet:
@@ -256,14 +204,13 @@ class Flow:
             6: 'TCP',
             17: 'UDP'
         }
-        return '[' + str(self.src_ip) + '(' + str(self.src_port) + ') <----------> ' + str(self.dst_ip) + '(' + str(
-            self.dst_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(
-            self.direction) + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
+        return '[' + str(self.source[1]) + '(' + str(self.source_port) + ') <----------> ' + str(self.destination[1]) + '(' + str(
+            self.destination_port) + ') ' + str(self.packet_time.get_flow_duration()) + ' ' + proto[self.protocol] + ' ' + str(self.packet_count.get_total()) + ' ' + str(self.prediction) + ']\n'
 
-    def get_data_as_list(self, direction=None) -> list:
+    def get_data_as_list(self, direction: PacketDirection=None) -> list:
 
-        return [*map(float, [self.src_port,
-                             self.dst_port,
+        return [*map(float, [self.source_port,
+                             self.destination_port,
                              self.protocol,
                              self.packet_length.packet_lengths[direction],
                              self.ack,
