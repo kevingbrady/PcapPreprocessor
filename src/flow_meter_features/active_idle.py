@@ -12,23 +12,23 @@ class ActiveIdle:
         self.active_stats = Statistics()
         self.idle_stats = Statistics()
 
-    def process_packet(self, packet, last_timestamp, direction) -> None:
+    def update_active_idle(self, inter_arrival_time) -> None:
 
-        if last_timestamp > 0:
+        if inter_arrival_time > 0:
 
-            timeout = packet.time - last_timestamp
+            if inter_arrival_time > constants.CLUMP_TIMEOUT:
 
-            if timeout > constants.CLUMP_TIMEOUT:
-
-                if (timeout - self.last_active) > constants.ACTIVE_TIMEOUT:
+                if (inter_arrival_time - self.last_active) > constants.ACTIVE_TIMEOUT:
                     duration = abs(float(self.last_active - self.start_active))
                     if duration > 0:
                         self.active = 1e3 * duration
-                    self.idle = 1e3 * (timeout - self.last_active)
-                    self.start_active = timeout
-                    self.last_active = timeout
+                    self.idle = 1e3 * (inter_arrival_time - self.last_active)
+                    self.start_active = inter_arrival_time
+                    self.last_active = inter_arrival_time
                 else:
-                    self.last_active = timeout
+                    self.last_active = inter_arrival_time
 
-            self.active_stats.calculate_statistics(self.active, direction)
-            self.idle_stats.calculate_statistics(self.idle, direction)
+            self.active_stats.calculate_statistics(self.active)
+            self.idle_stats.calculate_statistics(self.idle)
+
+

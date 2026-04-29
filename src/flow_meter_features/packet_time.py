@@ -7,52 +7,40 @@ class PacketTime(Statistics):
     """This class extracts features related to the Packet Times."""
 
     def __init__(self) -> None:
-        self.timestamps = {
-            None: {
-                'first_timestamp': 0,
-                'last_timestamp': 0,
-            },
-            PacketDirection.FORWARD: {
-                'first_timestamp': 0,
-                'last_timestamp': 0,
-            },
-            PacketDirection.REVERSE: {
-                'first_timestamp': 0,
-                'last_timestamp': 0,
-            },
-        }
 
         super().__init__()
 
-    def process_packet(self, packet, direction) -> None:
+        self.timestamps = {
+                'first_timestamp': 0.0,
+                'last_timestamp': 0.0,
+            }
 
-        latest_time = packet.time
+        self.iat = 0.0
 
-        if self.timestamps[None]['first_timestamp'] == 0:
-            self.timestamps[None]['first_timestamp'] = latest_time
+    def process_packet(self, packet) -> None:
 
-        if self.timestamps[direction]['first_timestamp'] == 0:
-            self.timestamps[direction]['first_timestamp'] = latest_time
+        packet_timestamp = float(packet.time)
 
-        if self.timestamps[direction]['last_timestamp'] > 0:
-            iat = self.get_packet_iat(latest_time, direction)
-            self.calculate_statistics(iat, direction)
+        if self.timestamps['first_timestamp'] == 0.0:
+            self.timestamps['first_timestamp'] = packet_timestamp
 
-        self.timestamps[None]['last_timestamp'] = latest_time
-        self.timestamps[direction]['last_timestamp'] = latest_time
+        if self.timestamps['last_timestamp'] > 0.0:
+            self.iat = self.get_packet_iat(packet_timestamp)
+            self.calculate_statistics(self.iat)
 
-    def get_packet_iat(self, latest_time, direction=None) -> float:
+        self.timestamps['last_timestamp'] = packet_timestamp
 
-        inter_arrival_time = 1e3 * float(latest_time - self.timestamps[direction]['last_timestamp'])
-        return inter_arrival_time
+    def get_packet_iat(self, latest_time) -> float:
 
-    def get_latest_timestamp(self, direction=None) -> float:
-        return self.timestamps[direction]["last_timestamp"]
+        return 1e3 * float(latest_time - self.timestamps['last_timestamp'])
 
-    def get_first_timestamp(self, direction=None) -> float:
-        return self.timestamps[direction]["first_timestamp"]
+    def get_first_timestamp(self) -> float:
+        return self.timestamps["first_timestamp"]
 
-    def get_flow_duration(self, direction=None) -> float:
-        if self.timestamps[direction]["first_timestamp"] > 0:
-            return self.timestamps[direction]["last_timestamp"] - self.timestamps[direction]["first_timestamp"]
-        return 0.0
+    def get_latest_timestamp(self) -> float:
+        return self.timestamps["last_timestamp"]
+
+    def get_flow_duration(self, latest_time) -> float:
+        if self.timestamps["first_timestamp"] == 0.0:
+            return 0.0
+        return latest_time - self.timestamps["first_timestamp"]

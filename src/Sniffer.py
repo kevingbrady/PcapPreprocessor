@@ -1,29 +1,27 @@
 from scapy.all import *
-from sympy.vector import parametric_region_list
 
 from src.PacketCounter import PacketCounter
-from src.FlowMeterMetrics import FlowMeterMetrics
+from src.ConnectionMeterMetrics import ConnectionMeterMetrics
 from src.utils import pretty_time_delta
 from src.Database import GraphDataset
 from multiprocessing import Manager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import numpy as np
-from torch_geometric.data import Data
+import shutil
+from torch_geometric.data import Data, TemporalData
 
 
 class Sniffer:
-    file_count = 0
-    graph_write_file_count = 5000
 
-    # max_blob_size = 1000000000
+    file_count = 0
+    graph_write_file_count = 25000
 
     def __init__(self, db_name: str) -> None:
 
         manager = Manager()
         self.completed = manager.list()
         self.in_progress = manager.list()
-        self.lock = manager.Lock()
 
         self.total_packets = manager.Value('i', 0)
         self.index = manager.Value('i', 0)
@@ -32,7 +30,7 @@ class Sniffer:
         self.db = GraphDataset(db_name)  # DatabaseAPI(db_name)
         self.display_output = ''
 
-    def run_sniffer(self, file: str) -> str:
+    def run_sniffer(self, file: str, write_to_db: bool=False) -> str:
 
         logging.info('Parsing file: ' + file)
 
@@ -48,59 +46,66 @@ class Sniffer:
 
         graph_snapshots = []
         graph_snapshot_count = 0
-        graph_snapshot_size = 0
-        flow_meter = FlowMeterMetrics(output_mode="flow")
+        connection_tracker = ConnectionMeterMetrics()
 
-        last_packet_timestamp = 0
+        last_graph_timestamp = 0
         time_steps_per_second = 5
         time_step = 1 / time_steps_per_second
 
         for pkt in PcapReader(file):
 
             counter.packet_count_total += 1
+            if last_graph_timestamp == 0.0:
+                last_graph_timestamp = pkt.time
 
             if ('IP' in pkt) or ('IPv6' in pkt):
                 if ('TCP' in pkt) or ('UDP' in pkt):
+
                     counter.packet_count_preprocessed += 1
-                    flow_meter.process_packet(pkt)
+                    connection_tracker.process_packet(pkt, filter=True)
 
-            if pkt.time - last_packet_timestamp >= time_step:
+            if pkt.time - last_graph_timestamp >= time_step:
 
-                flows = flow_meter.get_flows_as_list(pkt.time, time_step)
-                node_ids = list(flow_meter.node_ids.keys())
-
-                num_nodes = len(node_ids)
-                num_edges = len(flows)
-
-
-                flow_edge_list = [(flow_key.source[0], flow_key.destination[0]) for flow_key in flow_meter.flows.keys()]
+                nodes, node_features, connections, connection_edge_list = connection_tracker.get_graph_data(pkt.time - time_step, pkt.time, sparse=True)
+                num_nodes = len(nodes)
+                num_edges = len(connections)
 
                 graph = Data(
-                    x=torch.ones(num_nodes, 1),
-                    edge_index=torch.empty(2, 0, dtype=torch.long) if not flow_edge_list
-                        else torch.tensor(flow_edge_list, dtype=torch.long).t().contiguous(),
-                    edge_attr=torch.tensor(flows),
+                    x=node_features,
+                    edge_index=connection_edge_list,
+                    edge_attr=connections,
                     y=[torch.ones(num_edges, 1), torch.zeros(num_edges, 1)][target == 0],
-                    node_ids=node_ids,
+                    node_ids=nodes,
                     num_nodes=num_nodes,
                     num_edges=num_edges,
                     t=float(pkt.time)
                 )
 
-                graph_snapshots.append(GraphDataset.serialize(graph, base_filename))
+                '''
+                graph = TemporalData(
+                    src=connection_edge_list[0],
+                    dst=connection_edge_list[1],
+                    t=torch.tensor([pkt.time], dtype=torch.float),
+                    msg=connections,
+                    y=[torch.ones(num_edges, 1), torch.zeros(num_edges, 1)][target == 0],
+                    num_nodes=num_nodes,
+                    num_edges=num_edges
+                )
+                '''
+                graph_snapshots.append(GraphDataset.serialize(graph, float(pkt.time), base_filename))
                 graph_snapshot_count += 1
 
-                last_packet_timestamp = pkt.time
+                last_graph_timestamp = pkt.time
 
-                '''if len(graph_snapshots) >= self.graph_write_file_count:
-                    with self.lock:
-                        conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)
+            if write_to_db:
+                if len(graph_snapshots) % self.graph_write_file_count == 0:
+                    conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)
+                    graph_snapshots = []
 
-                    graph_snapshots = []'''
-        '''
-        if len(graph_snapshots) > 0:
-            with self.lock:
-                conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)'''
+
+        if write_to_db:
+            if len(graph_snapshots) > 0:
+                conn.insert_data_list(self.db.db_table_name, self.db.db_columns, graph_snapshots)
 
         self.index.value += counter.packet_count_preprocessed
         self.total_packets.value += counter.packet_count_total
@@ -108,53 +113,44 @@ class Sniffer:
 
         return file
 
-    def start_sniffer(self, file_list: list[str], display_progress: bool = True, parallel: bool = False) -> list:
+    def start_sniffer(self, file_list: list[str], write_to_db: bool=False, display_progress: bool = True, parallel: bool = False) -> None:
 
         if type(file_list) == str:
             file_list = [file_list]
 
-        results = []
         futures = []
         self.file_count = len(file_list)
-
-        if parallel:
-            pool = ProcessPoolExecutor(max_tasks_per_child=1)
+        num_workers = (1, os.cpu_count())[parallel]
+        pool = ProcessPoolExecutor(max_tasks_per_child=1, max_workers=num_workers)
 
         for i in file_list:
 
             logging.info('Parsing file: ' + i)
             self.in_progress.append(i)
 
-            if display_progress:
-                self.display_progress()
+            if display_progress: self.display_progress()
 
-            if parallel:
-                futures.append(pool.submit(self.run_sniffer, i))
+            futures.append(pool.submit(self.run_sniffer, i, write_to_db))
 
-            else:
-                self.run_sniffer(i)
-                self.in_progress.remove(i)
-                self.completed.append(i)
-                results.append(i)
+        for future in as_completed(futures):
+            file = future.result()
+            self.in_progress.remove(file)
+            self.completed.append(file)
 
-                if display_progress:
-                    self.display_progress()
+            if display_progress: self.display_progress()
 
-                logging.info('File completed: ' + results[-1])
+            logging.info('File completed: ' + file)
 
-        if parallel:
-            for future in futures:
-                file = future.result()
-                self.in_progress.remove(file)
-                self.completed.append(file)
-                results.append(file)
+        self.reorder_data_table_final()
 
-                if display_progress:
-                    self.display_progress()
+    def reorder_data_table_final(self):
+        conn = self.db.connect()
+        conn.execute_query(f'CREATE TABLE {self.db.db_table_name}_reorder AS SELECT * FROM {self.db.db_table_name} ORDER BY filename ASC, timestamp ASC')
+        conn.execute_query(f'DROP TABLE {self.db.db_table_name}')
+        conn.execute_query(f'ALTER TABLE {self.db.db_table_name}_reorder RENAME TO {self.db.db_table_name}')
+        conn.execute_query(f'CREATE INDEX timestamp_index ON {self.db.db_table_name} (timestamp)')
+        conn.execute_query(f'CREATE INDEX filename_index ON {self.db.db_table_name} (filename)')
 
-            logging.info('File completed: ' + results[-1])
-
-        return results
 
     @staticmethod
     def print_graph_details(graph, graph_snapshot_count) -> None:

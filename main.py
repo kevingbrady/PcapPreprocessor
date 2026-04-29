@@ -49,9 +49,9 @@ if __name__ == '__main__':
                     file_list.append(file_path)
 
         # Sort files by size with the largest files at the front of the list
-        file_list = sorted(file_list, key=lambda file: os.path.getsize(file))
+        file_list = sorted(file_list, key=lambda file: os.path.getsize(file), reverse=True)
 
     # Start ParallelSniffer with list of pcap files
-    results = sniffer_controller.start_sniffer(file_list, display_progress=True, parallel=True)
+    sniffer_controller.start_sniffer(file_list, write_to_db=False, display_progress=False, parallel=False)
     program_end = time.time()
     sniffer_controller.print_end_message(program_end - program_start)

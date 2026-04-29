@@ -8,24 +8,7 @@ class Statistics:
     Use Welford's algorithm to calculate moving mean and variance to keep statistics info for all flow metrics
     '''
     def __init__(self) -> None:
-        self.data = {
-            None: {
-                'count': 0,
-                'mean': 0.0,
-                'variance': 0.0,
-                'sum': 0,
-                'max': 0,
-                'min': 0
-            },
-            PacketDirection.FORWARD: {
-                'count': 0,
-                'mean': 0.0,
-                'variance': 0.0,
-                'sum': 0,
-                'max': 0,
-                'min': 0
-            },
-            PacketDirection.REVERSE: {
+        self.data =  {
                 'count': 0,
                 'mean': 0.0,
                 'variance': 0.0,
@@ -33,57 +16,51 @@ class Statistics:
                 'max': 0,
                 'min': 0
             }
-        }
 
-    def calculate_statistics(self, value, direction=None) -> None:
+    def calculate_statistics(self, value) -> None:
 
-        if direction is not None:
-            self.data[direction]['count'] += 1
+        self.data['count'] += 1
+        self._calculate_max_min(value)
+        self._calculate_statistics(value)
 
-        self.data[None]['count'] += 1
-        self._calculate_max_min(value, None)
-        self._calculate_max_min(value, direction)
-        self._calculate_statistics(value, None)
-        self._calculate_statistics(value, direction)
+    def get_avg(self) -> float:
+        return self.data['sum'] / self.data['count'] if self.data['count'] > 0 else 0.0
 
-    def get_avg(self, direction=None) -> float:
-        return self.data[direction]['sum'] / self.data[direction]['count'] if self.data[direction]['count'] > 0 else 0.0
+    def get_sum(self) -> Any:
+        return self.data['sum']
 
-    def get_sum(self, direction=None) -> Any:
-        return self.data[direction]['sum']
+    def get_max(self) -> Any:
+        return self.data['max']
 
-    def get_max(self, direction=None) -> Any:
-        return self.data[direction]['max']
+    def get_min(self) -> Any:
+        return self.data['min']
 
-    def get_min(self, direction=None) -> Any:
-        return self.data[direction]['min']
+    def get_mean(self) -> float:
 
-    def get_mean(self, direction=None) -> float:
+        return self.data['mean'] if self.data['count'] > 0 else 0.0
 
-        return self.data[direction]['mean'] if self.data[direction]['count'] > 0 else 0.0
+    def get_variance(self) -> float:
 
-    def get_variance(self, direction=None) -> float:
+        return self.data['variance'] if self.data['count'] > 0 else 0.0
 
-        return self.data[direction]['variance'] if self.data[direction]['count'] > 0 else 0.0
+    def get_standard_deviation(self) -> float:
 
-    def get_standard_deviation(self, direction=None) -> float:
+        return math.sqrt(self.get_variance() / (self.data['count'] - 1)) if self.data['count'] > 1 else 0.0
 
-        return math.sqrt(self.get_variance(direction) / (self.data[direction]['count'] - 1)) if self.data[direction]['count'] > 1 else 0.0
+    def _calculate_max_min(self, value) -> None:
 
-    def _calculate_max_min(self, value, direction) -> None:
+        self.data['sum'] += value
+        self.data['max'] = max([value, self.data['max']]) if self.data['max'] != 0 else value
+        self.data['min'] = min([value, self.data['min']]) if self.data['min'] != 0 else value
 
-        self.data[direction]['sum'] += value
-        self.data[direction]['max'] = max([value, self.data[direction]['max']]) if self.data[direction]['max'] != 0 else value
-        self.data[direction]['min'] = min([value, self.data[direction]['min']]) if self.data[direction]['min'] != 0 else value
+    def _calculate_statistics(self, value) -> None:
 
-    def _calculate_statistics(self, value, direction) -> None:
+        if self.data['count'] >= 1:
 
-        if self.data[direction]['count'] >= 1:
+            new_mean = self.data['mean'] + (value - self.data['mean']) * 1./self.data['count']
+            new_variance = self.data['variance'] + (value - self.data['mean']) * (value - new_mean)
 
-            new_mean = self.data[direction]['mean'] + (value - self.data[direction]['mean']) * 1./self.data[direction]['count']
-            new_variance = self.data[direction]['variance'] + (value - self.data[direction]['mean']) * (value - new_mean)
-
-            self.data[direction]['mean'] = new_mean
-            self.data[direction]['variance'] = new_variance
+            self.data['mean'] = new_mean
+            self.data['variance'] = new_variance
 
 

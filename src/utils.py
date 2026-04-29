@@ -1,6 +1,9 @@
 import logging
 import os
 import random
+import numpy as np
+from scipy.stats import entropy
+from scapy.all import Raw
 from argparse import ArgumentParser, ArgumentError, ArgumentTypeError, Namespace
 
 log = logging.getLogger('main.utils')
@@ -64,3 +67,20 @@ def generate_unique_integers(n):
         return []
     population = range(1, n + 1)
     return random.sample(population, k=n)
+
+
+def calculate_packet_entropy(packet):
+    """Calculates the Shannon entropy of a Scapy packet payload."""
+    if not packet.haslayer(Raw):
+        return 0.0
+
+    # Get raw bytes from payload
+    data = bytes(packet[Raw].load)
+    if not data:
+        return 0.0
+
+    # 1. Efficiently count byte frequencies (0-255)
+    _, counts = np.unique(list(data), return_counts=True)
+
+    # 2. Compute Shannon Entropy using scipy (base 2 for bits)
+    return entropy(counts, base=2)

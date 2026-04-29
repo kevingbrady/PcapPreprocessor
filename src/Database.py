@@ -33,9 +33,9 @@ class GraphDataset:
         conn.create_table(self.db_table_name, self.db_columns)
 
     @staticmethod
-    def serialize(graph: Data, filename: str) -> tuple[Any, int, int, float, str]:
+    def serialize(graph: Data, timestamp: float, filename: str) -> tuple[Any, int, int, float, str]:
         serialized_graph = lzma.compress(pickle.dumps(graph))
-        return serialized_graph, graph.num_nodes, graph.num_edges, graph.t, filename
+        return serialized_graph, graph.num_nodes, graph.num_edges, timestamp, filename
 
 
     @staticmethod

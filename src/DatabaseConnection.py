@@ -11,6 +11,7 @@ class DatabaseConnection:
     def connect(self) -> None:
         try:
             self.conn = sqlite3.connect(self.db_name)
+            self.conn.execute('PRAGMA journal_mode=WAL')
             self.cursor = self.conn.cursor()
             #print(f"Connected to database: {self.db_name}")
             #print(self.conn.execute("SELECT file FROM pragma_database_list WHERE name = 'main';").fetchone()[0])
@@ -35,12 +36,16 @@ class DatabaseConnection:
 
     def execute_multi_query(self, query, data_list, params=()):
         try:
+            self.execute_query("BEGIN IMMEDIATE")  # ACQUIRE DB LOCK
             self.cursor.executemany(query, data_list)
             self.conn.commit()
             return self.cursor.fetchall()
         except sqlite3.Error as e:
-            print(f"Error executing query: {e}")
-            return None
+            if str(e).__contains__('BEGIN IMMEDIATE'):
+                pass
+            else:
+                print(f"Error executing query: {e}")
+                return None
 
     def get_table_columns_tuple(self, table_columns: dict) -> tuple:
 
@@ -71,11 +76,13 @@ class DatabaseConnection:
 
     def insert_data_list(self, table_name, table_columns, data):
 
-        columns = self.get_table_columns_tuple(table_columns)
-        mask = '?,' * (len(columns) - 1) + '?'
 
-        query = f'INSERT INTO "{table_name}" {columns} VALUES ({mask})'
-        self.execute_multi_query(query, data)
+            columns = self.get_table_columns_tuple(table_columns)
+            mask = '?,' * (len(columns) - 1) + '?'
+
+            query = f'INSERT INTO "{table_name}" {columns} VALUES ({mask})'
+            self.execute_multi_query(query, data)
+
 
     def insert_binary_data(self, table_name, table_columns, data):
         columns = self.get_table_columns_tuple(table_columns)
